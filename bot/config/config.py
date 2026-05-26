@@ -31,4 +31,3 @@ class Config:
     
     # Queue settings
     MAX_QUEUE_SIZE = 20
-    MAX_CONCURRENT_COMPRESSIONS = 4
