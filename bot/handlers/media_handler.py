@@ -138,9 +138,11 @@ async def compression_stage(client, task, queue_manager):
     output_path = os.path.join(Config.TEMP_DIR, f"compressed_{message.id}.mp4")
     task['paths'].append(output_path)
 
+    markup = InlineKeyboardMarkup([[InlineKeyboardButton("❌ Cancel", callback_data=f"cancel_{msg_id}")]])
+
     await status_msg.edit_text(
         f"⚙️ Compressing ({preset_name})...",
-        reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("❌ Cancel", callback_data=f"cancel_{msg_id}")]])
+        reply_markup=markup
     )
     start_time = time.time()
     last_update = start_time
@@ -163,14 +165,14 @@ async def compression_stage(client, task, queue_manager):
 
         await status_msg.edit_text(
             "📤 Uploading...",
-            reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("❌ Cancel", callback_data=f"cancel_{msg_id}")]])
+            reply_markup=markup
         )
         start_time = time.time()
         last_update = start_time
 
         async def up_progress(current, total):
             nonlocal last_update
-            last_update = await progress_bar(current, total, "Uploading", status_msg, start_time, last_update, task)
+            last_update = await progress_bar(current, total, "Uploading", status_msg, start_time, last_update, task, reply_markup=markup)
 
         orig_size = os.path.getsize(input_path)
         comp_size = os.path.getsize(output_path)
