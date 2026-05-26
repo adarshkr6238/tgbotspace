@@ -48,9 +48,14 @@ async def handle_video(client, message, queue_manager):
             'preset_override': preset_override
         }
         
+        markup = InlineKeyboardMarkup([
+            [InlineKeyboardButton("✨ /diff Quality Mode", callback_data=f"diff_{status_msg.id}")],
+            [InlineKeyboardButton("❌ Cancel", callback_data=f"cancel_{status_msg.id}")]
+        ])
+        
         await status_msg.edit_text(
             "⏳ Adding to queue...",
-            reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("❌ Cancel", callback_data=f"cancel_{status_msg.id}")]])
+            reply_markup=markup
         )
         
         success, pos = await queue_manager.add_task(task)
@@ -60,7 +65,7 @@ async def handle_video(client, message, queue_manager):
 
         await status_msg.edit_text(
             f"📝 Added to queue (Position: {pos})\n\nShort videos (<= 5 min) get priority!",
-            reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("❌ Cancel", callback_data=f"cancel_{status_msg.id}")]])
+            reply_markup=markup
         )
     except Exception as e:
         logger.error(f"Error in handle_video for msg {message.id}: {e}", exc_info=True)
@@ -74,9 +79,14 @@ async def download_stage(client, task):
         await status_msg.edit_text("❌ Task Cancelled.")
         return
 
+    markup = InlineKeyboardMarkup([
+        [InlineKeyboardButton("✨ /diff Quality Mode", callback_data=f"diff_{msg_id}")],
+        [InlineKeyboardButton("❌ Cancel", callback_data=f"cancel_{msg_id}")]
+    ])
+
     await status_msg.edit_text(
         "📥 Downloading...",
-        reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("❌ Cancel", callback_data=f"cancel_{msg_id}")]])
+        reply_markup=markup
     )
     start_time = time.time()
     last_update = start_time
@@ -89,7 +99,7 @@ async def download_stage(client, task):
 
     async def down_progress(current, total):
         nonlocal last_update
-        last_update = await progress_bar(current, total, "Downloading", status_msg, start_time, last_update, task)
+        last_update = await progress_bar(current, total, "Downloading", status_msg, start_time, last_update, task, reply_markup=markup)
 
     try:
         setup_storage()
@@ -139,7 +149,7 @@ async def compression_stage(client, task, queue_manager):
         nonlocal last_update
         if task.get('is_paused'):
             return last_update
-        last_update = await progress_bar(current, total, f"Compressing ({preset_name})", status_msg, start_time, last_update, task)
+        last_update = await progress_bar(current, total, f"Compressing ({preset_name})", status_msg, start_time, last_update, task, reply_markup=markup)
 
     try:
         success, error_msg = await compress_video(input_path, output_path, preset_name, comp_progress, task)

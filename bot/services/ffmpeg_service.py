@@ -78,7 +78,7 @@ async def compress_video(input_path, output_path, preset_name, progress_callback
             '-threads', '0', 
             '-c:v', 'libx264', '-preset', 'fast', '-crf', '24',
             '-pix_fmt', 'yuv420p',
-            '-c:a', 'aac', '-ac', '2', '-b:a', '128k',
+            '-c:a', 'aac', '-ac', '2', '-b:a', '96k',
             '-movflags', '+faststart'
         ]
         if fps > 24:

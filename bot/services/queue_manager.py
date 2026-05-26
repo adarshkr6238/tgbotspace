@@ -71,6 +71,8 @@ class QueueManager:
 
     async def _run_download_task(self, task, priority, count):
         msg_id = task['status_msg'].id
+        
+        # Phase 1: Wait for a download slot
         self.waiting_for_slot_count += 1
         try:
             while True:
@@ -81,19 +83,22 @@ class QueueManager:
                 if is_cancelled(msg_id):
                     return
                 await asyncio.sleep(2) 
-
-            self.waiting_for_slot_count = max(0, self.waiting_for_slot_count - 1)
-            self.active_download_count += 1
-            
-            try:
-                await self.process_download(task)
-                await self.compression_queue.put((priority, count, task))
-            except Exception as e:
-                logger.error(f"Download task failed: {e}")
-                self.cleanup_task(task)
-            finally:
-                self.active_download_count = max(0, self.active_download_count - 1)
         finally:
+            self.waiting_for_slot_count = max(0, self.waiting_for_slot_count - 1)
+
+        # Phase 2: Perform the download
+        self.active_download_count += 1
+        try:
+            from bot.utils.progress import is_cancelled
+            if is_cancelled(msg_id):
+                return
+            await self.process_download(task)
+            await self.compression_queue.put((priority, count, task))
+        except Exception as e:
+            logger.error(f"Download task failed: {e}")
+            self.cleanup_task(task)
+        finally:
+            self.active_download_count = max(0, self.active_download_count - 1)
             self.download_queue.task_done()
 
     async def compression_worker(self):
@@ -204,7 +209,6 @@ class QueueManager:
         self.all_tasks = {}
         self.active_compression_task = None
         self.paused_compression_tasks = []
-        self.is_paused = False
         self.active_download_count = 0
         self.waiting_for_slot_count = 0
         self.task_counter = 0 

@@ -17,7 +17,7 @@ def is_cancelled(msg_id):
 def clear_cancel_flag(msg_id):
     _cancelled_tasks.discard(msg_id)
 
-async def progress_bar(current, total, status_text, message, start_time, last_update_time, task=None):
+async def progress_bar(current, total, status_text, message, start_time, last_update_time, task=None, reply_markup=None):
     global _last_string
     msg_id = message.id
 
@@ -55,9 +55,10 @@ async def progress_bar(current, total, status_text, message, start_time, last_up
 
     try:
         from pyrogram.types import InlineKeyboardMarkup, InlineKeyboardButton
+        markup = reply_markup or InlineKeyboardMarkup([[InlineKeyboardButton("❌ Cancel", callback_data=f"cancel_{msg_id}")]])
         await message.edit_text(
             progress_str,
-            reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("❌ Cancel", callback_data=f"cancel_{msg_id}")]])
+            reply_markup=markup
         )
     except FloodWait as e:
         logger.warning(f"FloodWait in progress bar: sleeping for {e.value}s in background")

@@ -108,6 +108,15 @@ class BotManager:
             await cb.answer("Cancelling task...", show_alert=True)
             await cb.message.edit_text("❌ Cancellation requested. Moving to next task...")
 
+        async def _diff_cb_wrapper(c, cb):
+            msg_id = int(cb.data.split("_")[1])
+            task = bot.queue_manager.all_tasks.get(msg_id)
+            if task:
+                task['preset_override'] = "diff"
+                await cb.answer("✨ Quality Mode (/diff) enabled for this video!", show_alert=True)
+            else:
+                await cb.answer("❌ Task not found or already processing.", show_alert=True)
+
         # Clone Management Commands (Owner Only)
         async def _addbot_cmd(c, m):
             if m.from_user.id != Config.OWNER_ID: return
@@ -135,6 +144,7 @@ class BotManager:
         bot.on_callback_query(filters.regex("^settings_main$"))(_settings_cb_wrapper)
         bot.on_callback_query(filters.regex("^set_"))(_set_preset_wrapper)
         bot.on_callback_query(filters.regex("^cancel_"))(_cancel_cb_wrapper)
+        bot.on_callback_query(filters.regex("^diff_"))(_diff_cb_wrapper)
         bot.on_message(filters.command("stats") & filters.private)(_stats_wrapper)
         bot.on_message(filters.command("queue") & filters.private)(_queue_wrapper)
         bot.on_message(filters.command("clear") & filters.private)(_clear_wrapper)
