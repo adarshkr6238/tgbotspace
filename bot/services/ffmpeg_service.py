@@ -76,9 +76,11 @@ async def compress_video(input_path, output_path, preset_name, progress_callback
             '-i', input_path,
             '-avoid_negative_ts', 'make_zero',
             '-threads', '0', 
+            '-fps_mode', 'cfr', # Fix pts/dts issues by forcing constant frame rate
             '-c:v', 'libx264', '-preset', 'fast', '-crf', '24',
             '-pix_fmt', 'yuv420p',
             '-c:a', 'aac', '-ac', '2', '-b:a', '96k',
+            '-max_muxing_queue_size', '1024',
             '-movflags', '+faststart'
         ]
         if fps > 24:
@@ -90,6 +92,7 @@ async def compress_video(input_path, output_path, preset_name, progress_callback
             '-i', input_path,
             '-avoid_negative_ts', 'make_zero', # Fix negative start times
             '-threads', '0', 
+            '-fps_mode', 'cfr', # Fix pts/dts issues
             '-c:v', 'libx264', '-preset', 'superfast'
         ]
 
@@ -98,7 +101,9 @@ async def compress_video(input_path, output_path, preset_name, progress_callback
 
         cmd.extend([
             '-b:v', v_bitrate,
-            '-c:a', 'aac', '-b:a', a_bitrate, '-movflags', '+faststart'
+            '-c:a', 'aac', '-b:a', a_bitrate, 
+            '-max_muxing_queue_size', '1024',
+            '-movflags', '+faststart'
         ])
         
         if target_height != -2:
