@@ -243,6 +243,17 @@ class BotManager:
 
 async def main():
     setup_storage()
+    
+    # Log actual hardware resources on the Space
+    import psutil
+    import os
+    ram = psutil.virtual_memory()
+    logger.info(f"--- SYSTEM RESOURCES ---")
+    logger.info(f"CPU Cores: {os.cpu_count()}")
+    logger.info(f"Total RAM: {ram.total // (2**30)}GB ({ram.total // (2**20)}MB)")
+    logger.info(f"Available RAM: {ram.available // (2**20)}MB")
+    logger.info(f"------------------------")
+
     asyncio.create_task(start_health_server())
     
     manager = BotManager()
