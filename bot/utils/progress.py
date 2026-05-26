@@ -72,6 +72,11 @@ async def progress_bar(current, total, status_text, message, start_time, last_up
         
     return now
 
+def truncate_text(text, max_len=3000):
+    if len(text) <= max_len:
+        return text
+    return text[:max_len-50] + "\n\n... (Text Truncated) ..."
+
 def format_bytes(size):
     power = 2**10
     n = 0

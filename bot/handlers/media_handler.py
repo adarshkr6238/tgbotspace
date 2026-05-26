@@ -4,7 +4,7 @@ import logging
 from pyrogram import Client, filters
 from pyrogram.types import Message, InlineKeyboardMarkup, InlineKeyboardButton
 from bot.config.config import Config
-from bot.utils.progress import progress_bar, format_bytes, is_cancelled, clear_cancel_flag
+from bot.utils.progress import progress_bar, format_bytes, is_cancelled, clear_cancel_flag, truncate_text
 from bot.services.ffmpeg_service import compress_video, get_video_info
 from bot.services.storage_service import setup_storage
 
@@ -158,7 +158,7 @@ async def compression_stage(client, task, queue_manager):
              raise Exception("CANCELLED")
              
         if not success:
-            await status_msg.edit_text(f"❌ Compression failed:\n\n`{error_msg}`")
+            await status_msg.edit_text(f"❌ Compression failed:\n\n`{truncate_text(error_msg, 2000)}`")
             return
 
         await status_msg.edit_text(
@@ -208,5 +208,5 @@ async def compression_stage(client, task, queue_manager):
         if str(e) == "CANCELLED":
             await status_msg.edit_text("❌ Task Cancelled.")
         else:
-            await status_msg.edit_text(f"❌ Error: {e}")
+            await status_msg.edit_text(f"❌ Error: {truncate_text(str(e), 2000)}")
         clear_cancel_flag(msg_id)
