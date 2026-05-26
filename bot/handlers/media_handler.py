@@ -10,6 +10,22 @@ from bot.services.storage_service import setup_storage
 
 logger = logging.getLogger(__name__)
 
+async def send_log_file(message, text, title="Error Log"):
+    log_path = f"error_log_{message.id}.txt"
+    try:
+        with open(log_path, "w") as f:
+            f.write(text)
+        await message.reply_document(
+            document=log_path,
+            caption=f"❌ **{title}**\nFull logs attached above.",
+            quote=True
+        )
+    except Exception as e:
+        logger.error(f"Failed to send log file: {e}")
+    finally:
+        if os.path.exists(log_path):
+            os.remove(log_path)
+
 async def handle_video(client, message, queue_manager):
     try:
         user_id = message.from_user.id
@@ -120,7 +136,8 @@ async def download_stage(client, task):
         if str(e) == "CANCELLED":
             await status_msg.edit_text("❌ Task Cancelled.")
         else:
-            await status_msg.edit_text(f"❌ Download failed: {e}")
+            await status_msg.edit_text("❌ **Download Failed.** Sending logs...")
+            await send_log_file(message, str(e), "Download Error")
         raise e
 
 async def compression_stage(client, task, queue_manager):
@@ -160,7 +177,8 @@ async def compression_stage(client, task, queue_manager):
              raise Exception("CANCELLED")
              
         if not success:
-            await status_msg.edit_text(f"❌ Compression failed:\n\n`{truncate_text(error_msg, 2000)}`")
+            await status_msg.edit_text("❌ **Compression Failed.** Sending logs...")
+            await send_log_file(message, error_msg, "Compression Error")
             return
 
         await status_msg.edit_text(
@@ -210,5 +228,6 @@ async def compression_stage(client, task, queue_manager):
         if str(e) == "CANCELLED":
             await status_msg.edit_text("❌ Task Cancelled.")
         else:
-            await status_msg.edit_text(f"❌ Error: {truncate_text(str(e), 2000)}")
+            await status_msg.edit_text("❌ **System Error.** Sending logs...")
+            await send_log_file(message, str(e), "System Exception")
         clear_cancel_flag(msg_id)
