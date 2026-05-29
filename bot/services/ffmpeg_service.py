@@ -204,53 +204,12 @@ async def merge_videos(input_paths, output_path, progress_callback, task):
         except: pass
         return True, ""
 
-    # Stage 2: Fallback to Re-encoding (Robust but slower)
-    # This handles mismatched codecs, resolutions, or pixel formats
-    logger.info("Fast merge failed. Falling back to re-encoding merge...")
-    
-    # Construct complex filter: [0:v][0:a][1:v][1:a]...concat=n=N:v=1:a=1[v][a]
-    filter_complex = ""
-    for i in range(len(input_paths)):
-        filter_complex += f"[{i}:v:0][{i}:a:0]" # Interleaved: V0, A0, V1, A1...
-    
-    filter_complex += f"concat=n={len(input_paths)}:v=1:a=1[v][a]"
-    
-    cmd = [
-        'ffmpeg', '-y'
-    ]
-    for p in input_paths:
-        cmd.extend(['-i', p])
-        
-    cmd.extend([
-        '-filter_complex', filter_complex,
-        '-map', '[v]', '-map', '[a]',
-        '-c:v', 'libx264', '-preset', 'ultrafast', '-crf', '28',
-        '-c:a', 'aac', '-b:a', '128k',
-        output_path
-    ])
-
-    process = await asyncio.create_subprocess_exec(*cmd, stderr=asyncio.subprocess.PIPE)
-    task['process'] = process
-    full_stderr = ""
-    while True:
-        try:
-            chunk = await process.stderr.read(1024)
-            if not chunk: break
-            line = chunk.decode('utf-8', errors='ignore')
-            full_stderr += line
-            if "time=" in line:
-                match = TIME_REGEX.search(line)
-                if match:
-                    h, m, s = match.group(1).split(":")
-                    current_time = int(h)*3600 + int(m)*60 + float(s)
-                    if total_duration > 0: await progress_callback(current_time, total_duration)
-        except: break
-    await process.wait()
     task['process'] = None
     try: os.remove(concat_file)
     except: pass
     
-    return process.returncode == 0, full_stderr if process.returncode != 0 else ""
+    error_detail = "Fast Merge Failed. To merge videos quickly, they must be the EXACT same format (codec, resolution, etc.). Your videos are different. Please ensure files are identical before merging."
+    return False, f"{error_detail}\n\nFFmpeg Error:\n{full_stderr}"
 
 async def split_video(input_path, output_dir, parts, progress_callback, task):
     info = await get_video_info(input_path)
