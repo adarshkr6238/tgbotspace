@@ -16,6 +16,7 @@ class Config:
     # Storage settings (Local paths are more stable on HF)
     DOWNLOAD_DIR = "downloads"
     TEMP_DIR = "work_temp"
+    PUBLIC_DIR = "public_downloads"
     
     # FFmpeg presets (Logic handled in ffmpeg_service.py)
     PRESETS = {

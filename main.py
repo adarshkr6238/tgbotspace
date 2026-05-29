@@ -23,6 +23,10 @@ async def health_check(request):
 async def start_health_server():
     app = web.Application()
     app.router.add_get("/", health_check)
+    
+    os.makedirs(Config.PUBLIC_DIR, exist_ok=True)
+    app.router.add_static("/dl/", path=Config.PUBLIC_DIR, name="dl")
+    
     runner = web.AppRunner(app)
     await runner.setup()
     port = int(os.environ.get("PORT", 7860))

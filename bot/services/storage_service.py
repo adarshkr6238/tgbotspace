@@ -7,16 +7,17 @@ from bot.config.config import Config
 logger = logging.getLogger(__name__)
 
 def setup_storage():
-    for d in [Config.DOWNLOAD_DIR, Config.TEMP_DIR]:
+    for d in [Config.DOWNLOAD_DIR, Config.TEMP_DIR, Config.PUBLIC_DIR]:
         os.makedirs(d, exist_ok=True)
 
 def cleanup_old_files():
     # Only delete files older than 40 minutes to avoid killing active tasks
     # 40 minutes = 2400 seconds
     now = time.time()
-    cutoff = now - 2400
+    cutoff_temp = now - 2400
+    cutoff_public = now - 10800 # 3 hours for public links
     
-    for d in [Config.DOWNLOAD_DIR, Config.TEMP_DIR]:
+    for d, cutoff in [(Config.DOWNLOAD_DIR, cutoff_temp), (Config.TEMP_DIR, cutoff_temp), (Config.PUBLIC_DIR, cutoff_public)]:
         if not os.path.exists(d):
             continue
         for f in os.listdir(d):
@@ -34,7 +35,7 @@ def cleanup_old_files():
 
 def wipe_all_storage():
     # Aggressive wipe: delete EVERYTHING in storage dirs instantly
-    for d in [Config.DOWNLOAD_DIR, Config.TEMP_DIR]:
+    for d in [Config.DOWNLOAD_DIR, Config.TEMP_DIR, Config.PUBLIC_DIR]:
         if not os.path.exists(d):
             continue
         for f in os.listdir(d):

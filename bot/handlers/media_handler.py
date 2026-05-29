@@ -218,6 +218,33 @@ async def compression_stage(client, task, queue_manager):
         elif preset_name == "edit_sample":
             await status_msg.edit_text("🎬 Extracting sample...", reply_markup=markup)
             success, error_msg = await extract_sample(input_path, output_path, comp_progress, task)
+        elif preset_name == "edit_link":
+            import uuid
+            import shutil
+            await status_msg.edit_text("🔗 Generating secure direct link...", reply_markup=markup)
+            
+            # Generate secure UUID filename to prevent scraping
+            ext = os.path.splitext(input_path)[1]
+            secure_filename = f"{uuid.uuid4().hex}{ext}"
+            public_path = os.path.join(Config.PUBLIC_DIR, secure_filename)
+            
+            shutil.copy2(input_path, public_path)
+            
+            # Construct public URL assuming standard HF space format
+            # Using environment variables if available, else fallback to shadow62 space
+            space_host = os.environ.get("SPACE_HOST", "shadow62-tgbotspace.hf.space")
+            download_url = f"https://{space_host}/dl/{secure_filename}"
+            
+            caption = (
+                f"✅ **File to Link Complete**\n\n"
+                f"📥 **Direct Link:** [Click to Download]({download_url})\n\n"
+                f"⚠️ *This link has no speed limits but will be permanently deleted after 3 hours for security.*"
+            )
+            
+            await message.reply_text(caption, quote=True, disable_web_page_preview=True)
+            await status_msg.delete()
+            clear_cancel_flag(msg_id)
+            return # Exit early, we don't upload back to telegram
         elif preset_name == "edit_vmerge":
             input_paths = [input_path]
             # Download all files registered for merge
