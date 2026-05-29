@@ -10,8 +10,8 @@ from pyrogram.file_id import FileId
 logger = logging.getLogger(__name__)
 
 # Configurable constants for transfer
-CHUNK_SIZE = 512 * 1024  # 512 KB per chunk (must be multiple of 1KB)
-MAX_WORKERS = 10         # Concurrent connections
+CHUNK_SIZE = 1024 * 1024  # 1MB per chunk (must be multiple of 1KB)
+MAX_WORKERS = 20         # Concurrent connections
 
 async def fast_download(client: Client, message, file_path: str, progress: Optional[Callable] = None):
     """

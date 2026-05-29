@@ -38,8 +38,8 @@ class VideoBot(Client):
             api_id=Config.API_ID,
             api_hash=Config.API_HASH,
             bot_token=token,
-            workers=10,
-            max_concurrent_transmissions=5,
+            workers=32,
+            max_concurrent_transmissions=20,
             sleep_threshold=60
         )
         self.queue_manager = QueueManager(self)
