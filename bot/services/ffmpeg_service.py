@@ -209,13 +209,11 @@ async def merge_videos(input_paths, output_path, progress_callback, task):
     logger.info("Fast merge failed. Falling back to re-encoding merge...")
     
     # Construct complex filter: [0:v][0:a][1:v][1:a]...concat=n=N:v=1:a=1[v][a]
-    filter_v = ""
-    filter_a = ""
+    filter_complex = ""
     for i in range(len(input_paths)):
-        filter_v += f"[{i}:v:0]"
-        filter_a += f"[{i}:a:0]"
+        filter_complex += f"[{i}:v:0][{i}:a:0]" # Interleaved: V0, A0, V1, A1...
     
-    filter_complex = f"{filter_v}{filter_a}concat=n={len(input_paths)}:v=1:a=1[v][a]"
+    filter_complex += f"concat=n={len(input_paths)}:v=1:a=1[v][a]"
     
     cmd = [
         'ffmpeg', '-y'
