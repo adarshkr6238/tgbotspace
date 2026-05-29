@@ -7,6 +7,7 @@ from bot.config.config import Config
 from bot.utils.progress import progress_bar, format_bytes, is_cancelled, clear_cancel_flag, truncate_text
 from bot.services.ffmpeg_service import compress_video, get_video_info, split_video, merge_videos, remove_stream, mux_audio_video
 from bot.services.storage_service import setup_storage
+from bot.utils.fast_transfer import fast_download, fast_upload
 
 logger = logging.getLogger(__name__)
 
@@ -121,7 +122,7 @@ async def download_stage(client, task, queue_manager):
 
     try:
         setup_storage()
-        await message.download(file_name=input_path, progress=down_progress)
+        await fast_download(client, message, input_path, progress=down_progress)
         
         if not task['duration']:
             info = await get_video_info(input_path)
@@ -314,11 +315,13 @@ async def compression_stage(client, task, queue_manager):
                 caption += f"✨ **Saved:** {saved_str}\n"
             caption += f"🛠️ **Preset/Mode:** {preset_name}"
 
-            await message.reply_video(
-                video=upload_path,
+            # Fast Upload
+            input_file = await fast_upload(client, upload_path, progress=up_progress)
+            
+            await message.reply_document(
+                document=input_file,
                 caption=caption,
-                quote=True,
-                progress=up_progress
+                quote=True
             )
             
         await status_msg.delete()
