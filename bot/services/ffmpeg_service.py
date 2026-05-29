@@ -160,16 +160,21 @@ async def compress_video(input_path, output_path, preset_name, progress_callback
     return True, None
 
 async def merge_videos(input_paths, output_path, progress_callback, task):
-    # Create concat file
-    concat_file = os.path.join(os.path.dirname(output_path), "concat.txt")
+    # Create concat file for demuxer (Stage 1: Fast Copy)
+    concat_file = os.path.join(os.path.dirname(output_path), f"concat_{os.path.basename(output_path)}.txt")
     total_duration = 0
+    for p in input_paths:
+        info = await get_video_info(p)
+        if info:
+            total_duration += float(info.get('format', {}).get('duration', 0))
+
     with open(concat_file, "w") as f:
         for p in input_paths:
-            f.write(f"file '{os.path.abspath(p)}'\n")
-            info = await get_video_info(p)
-            if info:
-                total_duration += float(info.get('format', {}).get('duration', 0))
+            # Escape single quotes for ffmpeg concat file
+            p_esc = os.path.abspath(p).replace("'", "'\\''")
+            f.write(f"file '{p_esc}'\n")
 
+    # Stage 1: Fast Copy
     cmd = [
         'ffmpeg', '-y', '-f', 'concat', '-safe', '0', '-i', concat_file,
         '-c', 'copy', output_path
@@ -189,13 +194,71 @@ async def merge_videos(input_paths, output_path, progress_callback, task):
                 if match:
                     h, m, s = match.group(1).split(":")
                     current_time = int(h)*3600 + int(m)*60 + float(s)
-                    if total_duration > 0:
-                        await progress_callback(current_time, total_duration)
+                    if total_duration > 0: await progress_callback(current_time, total_duration)
+        except: break
+    await process.wait()
+    
+    if process.returncode == 0:
+        task['process'] = None
+        try: os.remove(concat_file)
+        except: pass
+        return True, ""
+
+    # Stage 2: Fallback to Re-encoding (Robust but slower)
+    # This handles mismatched codecs, resolutions, or pixel formats
+    logger.info("Fast merge failed. Falling back to re-encoding merge...")
+    
+    # Construct complex filter: [0:v][0:a][1:v][1:a]...concat=n=N:v=1:a=1[v][a]
+    filter_complex = ""
+    inputs = []
+    for i in range(len(input_paths)):
+        inputs.extend(['-i', input_paths[i]])
+        filter_complex += f"[{i}:v:0][i}:a:0]" # Assumes 1 video + 1 audio per file
+    
+    # Actually need to check if audio exists for each file or it will fail
+    filter_v = ""
+    filter_a = ""
+    for i in range(len(input_paths)):
+        filter_v += f"[{i}:v:0]"
+        filter_a += f"[{i}:a:0]"
+    
+    filter_complex = f"{filter_v}{filter_a}concat=n={len(input_paths)}:v=1:a=1[v][a]"
+    
+    cmd = [
+        'ffmpeg', '-y'
+    ]
+    for p in input_paths:
+        cmd.extend(['-i', p])
+        
+    cmd.extend([
+        '-filter_complex', filter_complex,
+        '-map', '[v]', '-map', '[a]',
+        '-c:v', 'libx264', '-preset', 'ultrafast', '-crf', '28',
+        '-c:a', 'aac', '-b:a', '128k',
+        output_path
+    ])
+
+    process = await asyncio.create_subprocess_exec(*cmd, stderr=asyncio.subprocess.PIPE)
+    task['process'] = process
+    full_stderr = ""
+    while True:
+        try:
+            chunk = await process.stderr.read(1024)
+            if not chunk: break
+            line = chunk.decode('utf-8', errors='ignore')
+            full_stderr += line
+            if "time=" in line:
+                match = TIME_REGEX.search(line)
+                if match:
+                    h, m, s = match.group(1).split(":")
+                    current_time = int(h)*3600 + int(m)*60 + float(s)
+                    if total_duration > 0: await progress_callback(current_time, total_duration)
         except: break
     await process.wait()
     task['process'] = None
     try: os.remove(concat_file)
     except: pass
+    
     return process.returncode == 0, full_stderr if process.returncode != 0 else ""
 
 async def split_video(input_path, output_dir, parts, progress_callback, task):

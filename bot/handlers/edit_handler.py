@@ -214,4 +214,4 @@ async def handle_edit_action(client, callback_query, queue_manager):
         )
 
     else:
-        await callback_query.answer("⚠️ Feature backend logic is still being connected. Coming soon!", show_alert=True)
+        await callback_query.answer("⚠️ This feature action is not yet implemented.", show_alert=True)
