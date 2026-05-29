@@ -49,8 +49,9 @@ async def handle_edit_menu(client, callback_query, queue_manager):
     )
 
 async def handle_edit_action(client, callback_query, queue_manager):
-    action = callback_query.data.split("_")[1]
-    msg_id = int(callback_query.data.split("_")[2])
+    data_parts = callback_query.data.split("_")
+    action = data_parts[1]
+    msg_id = int(data_parts[-1]) # msg_id is always the last part
     task = queue_manager.all_tasks.get(msg_id)
     
     if not task:
@@ -127,8 +128,8 @@ async def handle_edit_action(client, callback_query, queue_manager):
             reply_markup=markup
         )
         
-    elif action.startswith("dosplit_"):
-        parts = int(action.split("_")[1])
+    elif action == "dosplit":
+        parts = int(data_parts[2])
         task['preset_override'] = f"edit_split_{parts}"
         queue_manager.clear_edit_state(task['user_id'])
         
@@ -153,7 +154,7 @@ async def handle_edit_action(client, callback_query, queue_manager):
         )
 
     elif action == "togglestream":
-        idx = int(callback_query.data.split("_")[3])
+        idx = int(data_parts[2])
         state = queue_manager.get_edit_state(task['user_id'])
         if not state or state['state'] != 'SELECTING_STREAMS':
             await callback_query.answer("❌ Invalid session.", show_alert=True)

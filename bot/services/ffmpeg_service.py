@@ -12,7 +12,7 @@ TIME_REGEX = re.compile(r"time=(\d+:\d+:\d+\.\d+)")
 
 async def get_video_info(file_path):
     cmd = [
-        'ffprobe', '-v', 'quiet', '-print_format', 'json=c=1', 
+        'ffprobe', '-v', 'error', '-print_format', 'json=c=1', 
         '-show_format', '-show_streams', file_path
     ]
     process = await asyncio.create_subprocess_exec(
@@ -20,6 +20,7 @@ async def get_video_info(file_path):
     )
     stdout, stderr = await process.communicate()
     if process.returncode != 0:
+        logger.error(f"ffprobe failed for {file_path}: {stderr.decode('utf-8', errors='ignore')}")
         return None
     return json.loads(stdout)
 
@@ -176,12 +177,13 @@ async def merge_videos(input_paths, output_path, progress_callback, task):
     
     process = await asyncio.create_subprocess_exec(*cmd, stderr=asyncio.subprocess.PIPE)
     task['process'] = process
-    
+    full_stderr = ""
     while True:
         try:
             chunk = await process.stderr.read(1024)
             if not chunk: break
             line = chunk.decode('utf-8', errors='ignore')
+            full_stderr += line
             if "time=" in line:
                 match = TIME_REGEX.search(line)
                 if match:
@@ -194,7 +196,7 @@ async def merge_videos(input_paths, output_path, progress_callback, task):
     task['process'] = None
     try: os.remove(concat_file)
     except: pass
-    return process.returncode == 0, ""
+    return process.returncode == 0, full_stderr if process.returncode != 0 else ""
 
 async def split_video(input_path, output_dir, parts, progress_callback, task):
     info = await get_video_info(input_path)
@@ -208,23 +210,26 @@ async def split_video(input_path, output_dir, parts, progress_callback, task):
     base_name = os.path.splitext(os.path.basename(input_path))[0]
     ext = os.path.splitext(input_path)[1]
 
+    last_stderr = ""
     for i in range(parts):
         start_time = i * part_duration
         out_file = os.path.join(output_dir, f"{base_name}_part{i+1}{ext}")
         output_files.append(out_file)
         
         cmd = [
-            'ffmpeg', '-y', '-i', input_path, 
-            '-ss', str(start_time), '-t', str(part_duration), 
+            'ffmpeg', '-y', '-ss', str(start_time), '-i', input_path, 
+            '-t', str(part_duration), 
             '-c', 'copy', out_file
         ]
         process = await asyncio.create_subprocess_exec(*cmd, stderr=asyncio.subprocess.PIPE)
         task['process'] = process
+        full_stderr = ""
         while True:
             try:
                 chunk = await process.stderr.read(1024)
                 if not chunk: break
                 line = chunk.decode('utf-8', errors='ignore')
+                full_stderr += line
                 if "time=" in line:
                     match = TIME_REGEX.search(line)
                     if match:
@@ -233,8 +238,13 @@ async def split_video(input_path, output_dir, parts, progress_callback, task):
                         await progress_callback(current_time + start_time, duration)
             except: break
         await process.wait()
+        if process.returncode != 0:
+            last_stderr = full_stderr
+            break
         
     task['process'] = None
+    if any(not os.path.exists(f) for f in output_files if f):
+         return [], last_stderr
     return output_files, ""
 
 async def remove_stream(input_path, output_path, stream_indices, progress_callback, task):
@@ -253,11 +263,13 @@ async def remove_stream(input_path, output_path, stream_indices, progress_callba
     
     process = await asyncio.create_subprocess_exec(*cmd, stderr=asyncio.subprocess.PIPE)
     task['process'] = process
+    full_stderr = ""
     while True:
         try:
             chunk = await process.stderr.read(1024)
             if not chunk: break
             line = chunk.decode('utf-8', errors='ignore')
+            full_stderr += line
             if "time=" in line:
                 match = TIME_REGEX.search(line)
                 if match:
@@ -267,7 +279,7 @@ async def remove_stream(input_path, output_path, stream_indices, progress_callba
         except: break
     await process.wait()
     task['process'] = None
-    return process.returncode == 0, ""
+    return process.returncode == 0, full_stderr if process.returncode != 0 else ""
 
 async def mux_audio_video(video_path, audio_path, output_path, progress_callback, task):
     info = await get_video_info(video_path)
@@ -281,11 +293,13 @@ async def mux_audio_video(video_path, audio_path, output_path, progress_callback
     ]
     process = await asyncio.create_subprocess_exec(*cmd, stderr=asyncio.subprocess.PIPE)
     task['process'] = process
+    full_stderr = ""
     while True:
         try:
             chunk = await process.stderr.read(1024)
             if not chunk: break
             line = chunk.decode('utf-8', errors='ignore')
+            full_stderr += line
             if "time=" in line:
                 match = TIME_REGEX.search(line)
                 if match:
@@ -295,5 +309,5 @@ async def mux_audio_video(video_path, audio_path, output_path, progress_callback
         except: break
     await process.wait()
     task['process'] = None
-    return process.returncode == 0, ""
+    return process.returncode == 0, full_stderr if process.returncode != 0 else ""
 
