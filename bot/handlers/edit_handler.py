@@ -112,5 +112,47 @@ async def handle_edit_action(client, callback_query, queue_manager):
             reply_markup=markup
         )
         
+    elif action == "stream":
+        queue_manager.set_edit_state(task['user_id'], 'WAITING_FOR_STREAM_INDEX', msg_id)
+        # Using a simple numpad for stream index (audio/subs usually 1, 2, 3)
+        stream_markup = InlineKeyboardMarkup([
+            [InlineKeyboardButton("Stream 1 (Usually Audio 1)", callback_data=f"edit_dostream_1_{msg_id}")],
+            [InlineKeyboardButton("Stream 2 (Usually Audio 2/Sub)", callback_data=f"edit_dostream_2_{msg_id}")],
+            [InlineKeyboardButton("Stream 3", callback_data=f"edit_dostream_3_{msg_id}")],
+            [InlineKeyboardButton("❌ Cancel", callback_data=f"cancel_{msg_id}")]
+        ])
+        await callback_query.message.edit_text(
+            "✂️ **Stream Remover**\n\nSelect the stream index to remove.\n*(Video is usually 0, primary audio is 1)*:",
+            reply_markup=stream_markup
+        )
+        
+    elif action.startswith("dostream_"):
+        idx = int(action.split("_")[1])
+        task['preset_override'] = f"edit_stream_{idx}"
+        queue_manager.clear_edit_state(task['user_id'])
+        markup = InlineKeyboardMarkup([[InlineKeyboardButton("❌ Cancel", callback_data=f"cancel_{msg_id}")]])
+        await callback_query.message.edit_text(
+            f"📝 Stream removal registered. Added to queue (Position: {queue_manager.get_position(task)}).",
+            reply_markup=markup
+        )
+
+    elif action == "avmerge":
+        queue_manager.set_edit_state(task['user_id'], 'WAITING_FOR_AUDIO_FILE', msg_id)
+        await callback_query.message.edit_text(
+            "🎶 **Audio/Video Merger**\n\n"
+            "Send the **Audio File** (MP3, M4A, etc.) you want to merge with this video.\n\n"
+            "*Video is already registered.*",
+            reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("❌ Cancel", callback_data=f"cancel_{msg_id}")]])
+        )
+
+    elif action == "rename":
+        queue_manager.set_edit_state(task['user_id'], 'WAITING_FOR_NEW_NAME', msg_id)
+        await callback_query.message.edit_text(
+            "📝 **Video Renamer**\n\n"
+            "This action requires text input.\n"
+            "Please **Reply** to this message with the new filename (e.g., `my_vacation.mp4`).",
+            reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("❌ Cancel", callback_data=f"cancel_{msg_id}")]])
+        )
+
     else:
         await callback_query.answer("⚠️ Feature backend logic is still being connected. Coming soon!", show_alert=True)

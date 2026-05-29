@@ -195,6 +195,36 @@ async def compression_stage(client, task, queue_manager):
                     task['paths'].append(dl_path)
             await status_msg.edit_text(f"⚙️ Merging {len(input_paths)} videos...", reply_markup=markup)
             success, error_msg = await merge_videos(input_paths, output_path, comp_progress, task)
+        elif preset_name.startswith("edit_stream_"):
+            idx = int(preset_name.split("_")[2])
+            await status_msg.edit_text(f"✂️ Removing stream {idx}...", reply_markup=markup)
+            success, error_msg = await remove_stream(input_path, output_path, idx, comp_progress, task)
+            
+        elif preset_name == "edit_avmerge":
+            if 'audio_file' in task:
+                await status_msg.edit_text("📥 Downloading audio file...", reply_markup=markup)
+                audio_path = os.path.join(Config.DOWNLOAD_DIR, f"{msg_id}_audio.m4a")
+                await client.download_media(task['audio_file'], file_name=audio_path)
+                task['paths'].append(audio_path)
+                await status_msg.edit_text("🎶 Merging Audio and Video...", reply_markup=markup)
+                success, error_msg = await mux_audio_video(input_path, audio_path, output_path, comp_progress, task)
+            else:
+                success, error_msg = False, "No audio file provided."
+                
+        elif preset_name == "edit_rename":
+            new_name = task.get('new_name', 'renamed_video.mp4')
+            await status_msg.edit_text(f"📝 Renaming to {new_name}...", reply_markup=markup)
+            # Rename doesn't need ffmpeg, just copy/move
+            import shutil
+            shutil.copy2(input_path, output_path)
+            # Override output_files to force the new name during upload
+            upload_target = os.path.join(Config.TEMP_DIR, new_name)
+            os.rename(output_path, upload_target)
+            output_files = [upload_target]
+            task['paths'].append(upload_target)
+            success = True
+            error_msg = ""
+            
         elif preset_name.startswith("edit_"):
             success = False
             error_msg = "This specific edit feature is still being integrated."

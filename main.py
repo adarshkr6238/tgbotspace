@@ -101,15 +101,48 @@ class BotManager:
         async def _clear_wrapper(c, m): await clear_cmd(c, m, bot.queue_manager)
         async def _media_wrapper(c, m):
             state = bot.queue_manager.get_edit_state(m.from_user.id)
-            if state and state['state'] == 'WAITING_FOR_MERGE_FILES':
-                media = m.video or m.document
-                if media and (not m.document or (m.document.mime_type and m.document.mime_type.startswith("video/"))):
-                    bot.queue_manager.add_edit_file(m.from_user.id, "TBD", media.file_id)
-                    await m.reply_text(f"✅ Video #{len(state['files']) + 1} registered. Send another or click **Finish & Merge**.")
-                else:
-                    await m.reply_text("❌ Please send a valid video file.")
-                return
+            if state:
+                if state['state'] == 'WAITING_FOR_MERGE_FILES':
+                    media = m.video or m.document
+                    if media and (not m.document or (m.document.mime_type and m.document.mime_type.startswith("video/"))):
+                        bot.queue_manager.add_edit_file(m.from_user.id, "TBD", media.file_id)
+                        await m.reply_text(f"✅ Video #{len(state['files']) + 1} registered. Send another or click **Finish & Merge**.")
+                    else:
+                        await m.reply_text("❌ Please send a valid video file.")
+                    return
+                elif state['state'] == 'WAITING_FOR_AUDIO_FILE':
+                    media = m.audio or m.document
+                    if media and (not m.document or (m.document.mime_type and m.document.mime_type.startswith("audio/"))):
+                        task = bot.queue_manager.all_tasks.get(state['msg_id'])
+                        if task:
+                            task['audio_file'] = media.file_id
+                            task['preset_override'] = "edit_avmerge"
+                            bot.queue_manager.clear_edit_state(m.from_user.id)
+                            await m.reply_text("✅ Audio received. A/V Merge task added to queue.")
+                        else:
+                            await m.reply_text("❌ Task expired.")
+                            bot.queue_manager.clear_edit_state(m.from_user.id)
+                    else:
+                        await m.reply_text("❌ Please send a valid audio file.")
+                    return
             await handle_video(c, m, bot.queue_manager)
+
+        async def _text_wrapper(c, m):
+            state = bot.queue_manager.get_edit_state(m.from_user.id)
+            if state and state['state'] == 'WAITING_FOR_NEW_NAME':
+                task = bot.queue_manager.all_tasks.get(state['msg_id'])
+                if task:
+                    new_name = m.text.strip()
+                    if not new_name.endswith(".mp4") and not new_name.endswith(".mkv"):
+                        new_name += ".mp4"
+                    task['new_name'] = new_name
+                    task['preset_override'] = "edit_rename"
+                    bot.queue_manager.clear_edit_state(m.from_user.id)
+                    await m.reply_text(f"✅ Renaming to `{new_name}`. Task added to queue.")
+                else:
+                    await m.reply_text("❌ Task expired.")
+                    bot.queue_manager.clear_edit_state(m.from_user.id)
+
 
         
         async def _stats_wrapper(c, m):
@@ -171,6 +204,7 @@ class BotManager:
         bot.on_message(filters.command("queue") & filters.private)(_queue_wrapper)
         bot.on_message(filters.command("clear") & filters.private)(_clear_wrapper)
         bot.on_message((filters.video | filters.document) & filters.private)(_media_wrapper)
+        bot.on_message(filters.text & filters.private)(_text_wrapper)
         
         # Clone commands
         bot.on_message(filters.command("addbot") & filters.private)(_addbot_cmd)
