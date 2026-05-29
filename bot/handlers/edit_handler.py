@@ -1,5 +1,29 @@
 from pyrogram.types import InlineKeyboardMarkup, InlineKeyboardButton
 
+def build_stream_keyboard(streams, streams_to_remove, msg_id):
+    buttons = []
+    for s in streams:
+        idx = s.get('index', 0)
+        codec_type = s.get('codec_type', 'unknown').upper()
+        tags = s.get('tags', {})
+        language = tags.get('language', 'und').upper()
+        title = tags.get('title', '')
+        
+        label = f"[{codec_type}] {language}"
+        if title:
+            label += f" - {title}"
+            
+        if idx in streams_to_remove:
+            label = f"✅ Remove: {label}"
+        else:
+            label = f"Keep: {label}"
+            
+        buttons.append([InlineKeyboardButton(label, callback_data=f"edit_togglestream_{idx}_{msg_id}")])
+        
+    buttons.append([InlineKeyboardButton("▶️ Finish & Remove Selected", callback_data=f"edit_finishstream_{msg_id}")])
+    buttons.append([InlineKeyboardButton("❌ Cancel", callback_data=f"cancel_{msg_id}")])
+    return InlineKeyboardMarkup(buttons)
+
 def get_edit_menu_markup(msg_id):
     return InlineKeyboardMarkup([
         [InlineKeyboardButton("✂️ Stream Remover", callback_data=f"edit_stream_{msg_id}")],
@@ -116,28 +140,59 @@ async def handle_edit_action(client, callback_query, queue_manager):
         )
         
     elif action == "stream":
-        queue_manager.set_edit_state(task['user_id'], 'WAITING_FOR_STREAM_INDEX', msg_id)
-        # Using a simple numpad for stream index (audio/subs usually 1, 2, 3)
-        stream_markup = InlineKeyboardMarkup([
-            [InlineKeyboardButton("Stream 1 (Usually Audio 1)", callback_data=f"edit_dostream_1_{msg_id}")],
-            [InlineKeyboardButton("Stream 2 (Usually Audio 2/Sub)", callback_data=f"edit_dostream_2_{msg_id}")],
-            [InlineKeyboardButton("Stream 3", callback_data=f"edit_dostream_3_{msg_id}")],
-            [InlineKeyboardButton("❌ Cancel", callback_data=f"cancel_{msg_id}")]
-        ])
-        await callback_query.message.edit_text(
-            "✂️ **Stream Remover**\n\nSelect the stream index to remove.\n*(Video is usually 0, primary audio is 1)*:",
-            reply_markup=stream_markup
-        )
+        # We can't show streams until the file is downloaded.
+        # Mark the state so the queue knows to pause after download and show the menu.
+        task['preset_override'] = "edit_stream_pending"
+        queue_manager.set_edit_state(task['user_id'], 'WAITING_FOR_DOWNLOAD_TO_FINISH', msg_id)
         
-    elif action.startswith("dostream_"):
-        idx = int(action.split("_")[1])
-        task['preset_override'] = f"edit_stream_{idx}"
+        await callback_query.message.edit_text(
+            "✂️ **Stream Remover**\n\n"
+            "Waiting for the video to finish downloading so I can analyze its tracks...\n"
+            "The menu will appear automatically.",
+            reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("❌ Cancel", callback_data=f"cancel_{msg_id}")]])
+        )
+
+    elif action == "togglestream":
+        idx = int(callback_query.data.split("_")[3])
+        state = queue_manager.get_edit_state(task['user_id'])
+        if not state or state['state'] != 'SELECTING_STREAMS':
+            await callback_query.answer("❌ Invalid session.", show_alert=True)
+            return
+            
+        streams_to_remove = state.get('streams_to_remove', set())
+        if idx in streams_to_remove:
+            streams_to_remove.remove(idx)
+        else:
+            streams_to_remove.add(idx)
+        state['streams_to_remove'] = streams_to_remove
+        
+        # Rebuild keyboard
+        markup = build_stream_keyboard(state['all_streams'], streams_to_remove, msg_id)
+        await callback_query.message.edit_reply_markup(reply_markup=markup)
+
+    elif action == "finishstream":
+        state = queue_manager.get_edit_state(task['user_id'])
+        if not state or state['state'] != 'SELECTING_STREAMS':
+            await callback_query.answer("❌ Invalid session.", show_alert=True)
+            return
+            
+        streams_to_remove = state.get('streams_to_remove', set())
+        if not streams_to_remove:
+            await callback_query.answer("⚠️ You haven't selected any streams to remove.", show_alert=True)
+            return
+            
+        # Format the preset string to pass multiple indices: e.g., "edit_stream_1_2_5"
+        indices_str = "_".join(map(str, streams_to_remove))
+        task['preset_override'] = f"edit_stream_{indices_str}"
+        task['is_editing'] = False
         queue_manager.clear_edit_state(task['user_id'])
+        
         markup = InlineKeyboardMarkup([[InlineKeyboardButton("❌ Cancel", callback_data=f"cancel_{msg_id}")]])
         await callback_query.message.edit_text(
-            f"📝 Stream removal registered. Added to queue (Position: {queue_manager.get_position(task)}).",
+            f"📝 Stream removal registered. Processing...",
             reply_markup=markup
         )
+
 
     elif action == "avmerge":
         queue_manager.set_edit_state(task['user_id'], 'WAITING_FOR_AUDIO_FILE', msg_id)

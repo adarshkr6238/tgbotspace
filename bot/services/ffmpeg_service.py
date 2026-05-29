@@ -237,16 +237,20 @@ async def split_video(input_path, output_dir, parts, progress_callback, task):
     task['process'] = None
     return output_files, ""
 
-async def remove_stream(input_path, output_path, stream_index, progress_callback, task):
+async def remove_stream(input_path, output_path, stream_indices, progress_callback, task):
     info = await get_video_info(input_path)
     if not info: return False, "Could not read video"
     duration = float(info.get('format', {}).get('duration', 0))
     
     cmd = [
         'ffmpeg', '-y', '-i', input_path, 
-        '-map', '0', f'-map', f'-0:{stream_index}', 
-        '-c', 'copy', output_path
+        '-map', '0'
     ]
+    for idx in stream_indices:
+        cmd.extend(['-map', f'-0:{idx}'])
+        
+    cmd.extend(['-c', 'copy', output_path])
+    
     process = await asyncio.create_subprocess_exec(*cmd, stderr=asyncio.subprocess.PIPE)
     task['process'] = process
     while True:

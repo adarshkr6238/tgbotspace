@@ -130,10 +130,34 @@ async def download_stage(client, task):
 
         if is_cancelled(msg_id):
             raise Exception("CANCELLED")
-        await status_msg.edit_text(
-            "✅ Ready for compression...",
-            reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("❌ Cancel", callback_data=f"cancel_{msg_id}")]])
-        )
+            
+        preset_name = task.get('preset_override')
+        if preset_name == "edit_stream_pending":
+            info = await get_video_info(input_path)
+            streams = info.get('streams', []) if info else []
+            from bot.handlers.edit_handler import build_stream_keyboard
+            
+            # Change state to SELECTING_STREAMS
+            task['is_editing'] = True
+            queue_manager.set_edit_state(task['user_id'], 'SELECTING_STREAMS', msg_id)
+            state = queue_manager.get_edit_state(task['user_id'])
+            state['all_streams'] = streams
+            state['streams_to_remove'] = set()
+            
+            markup = build_stream_keyboard(streams, state['streams_to_remove'], msg_id)
+            await status_msg.edit_text(
+                "✂️ **Stream Remover**\n\n"
+                "Analysis complete. Select the streams you want to **Remove**:\n"
+                "*(Click to toggle, then click Finish)*",
+                reply_markup=markup
+            )
+            # We don't advance to compression stage yet. The queue_manager will pause
+            # because 'is_editing' is True.
+        else:
+            await status_msg.edit_text(
+                "✅ Ready for processing...",
+                reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("❌ Cancel", callback_data=f"cancel_{msg_id}")]])
+            )
     except Exception as e:
         if str(e) == "CANCELLED":
             await status_msg.edit_text("❌ Task Cancelled.")
@@ -196,9 +220,14 @@ async def compression_stage(client, task, queue_manager):
             await status_msg.edit_text(f"⚙️ Merging {len(input_paths)} videos...", reply_markup=markup)
             success, error_msg = await merge_videos(input_paths, output_path, comp_progress, task)
         elif preset_name.startswith("edit_stream_"):
-            idx = int(preset_name.split("_")[2])
-            await status_msg.edit_text(f"✂️ Removing stream {idx}...", reply_markup=markup)
-            success, error_msg = await remove_stream(input_path, output_path, idx, comp_progress, task)
+            if preset_name == "edit_stream_pending":
+                # Should not happen here normally due to UI lock, but just in case
+                success, error_msg = False, "Waiting for stream selection."
+            else:
+                indices_str = preset_name.split("edit_stream_")[1]
+                indices = [int(x) for x in indices_str.split("_") if x]
+                await status_msg.edit_text(f"✂️ Removing {len(indices)} streams...", reply_markup=markup)
+                success, error_msg = await remove_stream(input_path, output_path, indices, comp_progress, task)
             
         elif preset_name == "edit_avmerge":
             if 'audio_file' in task:
