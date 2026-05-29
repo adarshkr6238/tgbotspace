@@ -87,7 +87,7 @@ async def handle_video(client, message, queue_manager):
     except Exception as e:
         logger.error(f"Error in handle_video for msg {message.id}: {e}", exc_info=True)
 
-async def download_stage(client, task):
+async def download_stage(client, task, queue_manager):
     message = task['message']
     status_msg = task['status_msg']
     msg_id = status_msg.id

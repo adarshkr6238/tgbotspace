@@ -47,7 +47,7 @@ class VideoBot(Client):
         self.queue_manager.process_compression = self._compression_bridge
 
     async def _download_bridge(self, task):
-        await download_stage(self, task)
+        await download_stage(self, task, self.queue_manager)
 
     async def _compression_bridge(self, task):
         await compression_stage(self, task, self.queue_manager)
