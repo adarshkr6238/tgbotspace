@@ -324,3 +324,49 @@ async def mux_audio_video(video_path, audio_path, output_path, progress_callback
     task['process'] = None
     return process.returncode == 0, full_stderr if process.returncode != 0 else ""
 
+async def extract_sample(input_path, output_path, progress_callback, task):
+    info = await get_video_info(input_path)
+    if not info: return False, "Could not read video info"
+    duration = float(info.get('format', {}).get('duration', 0))
+    
+    if duration <= 0:
+        return False, "Invalid video duration"
+        
+    # Choose start time: 10% into the video, but not more than 10 minutes (600s).
+    # If video is shorter than 2 minutes, start at 10 seconds.
+    if duration < 120:
+        start_time = min(10, duration / 4)
+    else:
+        start_time = min(duration * 0.1, 600)
+        
+    sample_duration = min(60, duration - start_time) # 1 minute max
+    if sample_duration <= 0:
+        sample_duration = duration # Fallback
+        start_time = 0
+
+    cmd = [
+        'ffmpeg', '-y', '-ss', str(start_time), '-i', input_path,
+        '-t', str(sample_duration),
+        '-c', 'copy', output_path
+    ]
+    
+    process = await asyncio.create_subprocess_exec(*cmd, stderr=asyncio.subprocess.PIPE)
+    task['process'] = process
+    full_stderr = ""
+    while True:
+        try:
+            chunk = await process.stderr.read(1024)
+            if not chunk: break
+            line = chunk.decode('utf-8', errors='ignore')
+            full_stderr += line
+            if "time=" in line:
+                match = TIME_REGEX.search(line)
+                if match:
+                    h, m, s = match.group(1).split(":")
+                    current_time = int(h)*3600 + int(m)*60 + float(s)
+                    if sample_duration > 0: await progress_callback(current_time, sample_duration)
+        except: break
+    await process.wait()
+    task['process'] = None
+    return process.returncode == 0, full_stderr if process.returncode != 0 else ""
+

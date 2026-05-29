@@ -5,7 +5,7 @@ from pyrogram import Client, filters
 from pyrogram.types import Message, InlineKeyboardMarkup, InlineKeyboardButton
 from bot.config.config import Config
 from bot.utils.progress import progress_bar, format_bytes, is_cancelled, clear_cancel_flag, truncate_text
-from bot.services.ffmpeg_service import compress_video, get_video_info, split_video, merge_videos, remove_stream, mux_audio_video
+from bot.services.ffmpeg_service import compress_video, get_video_info, split_video, merge_videos, remove_stream, mux_audio_video, extract_sample
 from bot.services.storage_service import setup_storage
 from bot.utils.fast_transfer import fast_download, fast_upload
 
@@ -215,6 +215,9 @@ async def compression_stage(client, task, queue_manager):
             if out_files:
                 output_files = out_files
                 success = True
+        elif preset_name == "edit_sample":
+            await status_msg.edit_text("🎬 Extracting sample...", reply_markup=markup)
+            success, error_msg = await extract_sample(input_path, output_path, comp_progress, task)
         elif preset_name == "edit_vmerge":
             input_paths = [input_path]
             # Download all files registered for merge

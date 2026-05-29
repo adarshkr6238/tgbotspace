@@ -26,6 +26,7 @@ def build_stream_keyboard(streams, streams_to_remove, msg_id):
 
 def get_edit_menu_markup(msg_id):
     return InlineKeyboardMarkup([
+        [InlineKeyboardButton("🎬 Sample Generator", callback_data=f"edit_sample_{msg_id}")],
         [InlineKeyboardButton("✂️ Stream Remover", callback_data=f"edit_stream_{msg_id}")],
         [InlineKeyboardButton("🔗 Video Merger", callback_data=f"edit_vmerge_{msg_id}")],
         [InlineKeyboardButton("🎶 Audio/Video Merger", callback_data=f"edit_avmerge_{msg_id}")],
@@ -73,6 +74,16 @@ async def handle_edit_action(client, callback_query, queue_manager):
 
     # Mark task as an edit task to bypass standard compression
     task['preset_override'] = f"edit_{action}"
+    
+    if action == "sample":
+        task['is_editing'] = False
+        queue_manager.clear_edit_state(task['user_id'])
+        markup = InlineKeyboardMarkup([[InlineKeyboardButton("❌ Cancel", callback_data=f"cancel_{msg_id}")]])
+        await callback_query.message.edit_text(
+            f"📝 Sample generation registered. Added to queue (Position: {queue_manager.get_position(task)}).",
+            reply_markup=markup
+        )
+        return
     
     if action == "vmerge":
         queue_manager.set_edit_state(task['user_id'], 'WAITING_FOR_MERGE_FILES', msg_id)
