@@ -19,7 +19,7 @@ class Config:
     
     # FFmpeg presets (Logic handled in ffmpeg_service.py)
     PRESETS = {
-        "low": {"desc": "Max 400p, high quality bitrate"},
+        "low": {"desc": "Max 450p, high quality bitrate"},
         "medium": {"desc": "Max 360p, balanced bitrate"},
         "high": {"desc": "Max 240p, small file"}
     }
@@ -30,4 +30,4 @@ class Config:
     PROGRESS_UPDATE_INTERVAL = 5
     
     # Queue settings
-    MAX_QUEUE_SIZE = 20
+    MAX_QUEUE_SIZE = 70
