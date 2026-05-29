@@ -92,7 +92,10 @@ async def fast_upload(client: Client, file_path: str, progress: Optional[Callabl
     Uploads a file using parallel chunking via Pyrogram's raw API, returning an InputFile.
     """
     file_size = os.path.getsize(file_path)
-    file_id = os.urandom(8).hex() # Random unique ID for the file session
+    
+    import random
+    # Telegram requires a 64-bit signed integer for file_id
+    file_id = random.randint(-9223372036854775808, 9223372036854775807)
     
     if file_size == 0:
         raise ValueError("Cannot upload empty file")
@@ -119,7 +122,7 @@ async def fast_upload(client: Client, file_path: str, progress: Optional[Callabl
                     if is_big:
                         await client.invoke(
                             functions.upload.SaveBigFilePart(
-                                file_id=int(file_id, 16),
+                                file_id=file_id,
                                 file_part=part_num,
                                 file_total_parts=total_parts,
                                 bytes=chunk
@@ -128,7 +131,7 @@ async def fast_upload(client: Client, file_path: str, progress: Optional[Callabl
                     else:
                         await client.invoke(
                             functions.upload.SaveFilePart(
-                                file_id=int(file_id, 16),
+                                file_id=file_id,
                                 file_part=part_num,
                                 bytes=chunk
                             )
@@ -151,13 +154,13 @@ async def fast_upload(client: Client, file_path: str, progress: Optional[Callabl
     filename = os.path.basename(file_path)
     if is_big:
         return types.InputFileBig(
-            id=int(file_id, 16),
+            id=file_id,
             parts=total_parts,
             name=filename
         )
     else:
         return types.InputFile(
-            id=int(file_id, 16),
+            id=file_id,
             parts=total_parts,
             name=filename,
             md5_checksum="" # MD5 is optional and complex to compute fast, leaving empty
