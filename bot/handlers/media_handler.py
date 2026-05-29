@@ -178,7 +178,14 @@ async def compression_stage(client, task, queue_manager):
         return
 
     preset_name = task.get('preset_override') or queue_manager.get_user_preset(user_id)
-    output_path = os.path.join(Config.TEMP_DIR, f"compressed_{message.id}.mp4")
+    
+    # Use input extension if it's an edit task, otherwise default to .mp4 for compression
+    if preset_name.startswith("edit_"):
+        file_ext = os.path.splitext(input_path)[1] or ".mp4"
+    else:
+        file_ext = ".mp4"
+        
+    output_path = os.path.join(Config.TEMP_DIR, f"compressed_{message.id}{file_ext}")
     task['paths'].append(output_path)
 
     markup = InlineKeyboardMarkup([[InlineKeyboardButton("❌ Cancel", callback_data=f"cancel_{msg_id}")]])
