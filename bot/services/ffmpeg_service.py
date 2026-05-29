@@ -209,13 +209,6 @@ async def merge_videos(input_paths, output_path, progress_callback, task):
     logger.info("Fast merge failed. Falling back to re-encoding merge...")
     
     # Construct complex filter: [0:v][0:a][1:v][1:a]...concat=n=N:v=1:a=1[v][a]
-    filter_complex = ""
-    inputs = []
-    for i in range(len(input_paths)):
-        inputs.extend(['-i', input_paths[i]])
-        filter_complex += f"[{i}:v:0][i}:a:0]" # Assumes 1 video + 1 audio per file
-    
-    # Actually need to check if audio exists for each file or it will fail
     filter_v = ""
     filter_a = ""
     for i in range(len(input_paths)):
