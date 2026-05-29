@@ -105,46 +105,11 @@ class BotManager:
                 media = m.video or m.document
                 if media and (not m.document or (m.document.mime_type and m.document.mime_type.startswith("video/"))):
                     bot.queue_manager.add_edit_file(m.from_user.id, "TBD", media.file_id)
-                    await m.reply_text("✅ Video registered for merging. Send another or type `/finish_merge`.")
+                    await m.reply_text(f"✅ Video #{len(state['files']) + 1} registered. Send another or click **Finish & Merge**.")
                 else:
                     await m.reply_text("❌ Please send a valid video file.")
                 return
             await handle_video(c, m, bot.queue_manager)
-
-        async def _text_wrapper(c, m):
-            state = bot.queue_manager.get_edit_state(m.from_user.id)
-            if not state:
-                return
-                
-            if state['state'] == 'WAITING_FOR_SPLIT_COUNT':
-                try:
-                    parts = int(m.text.strip())
-                    if parts < 2 or parts > 10:
-                        await m.reply_text("⚠️ Please enter a number between 2 and 10.")
-                        return
-                    task = bot.queue_manager.all_tasks.get(state['msg_id'])
-                    if task:
-                        task['preset_override'] = f"edit_split_{parts}"
-                        bot.queue_manager.clear_edit_state(m.from_user.id)
-                        await m.reply_text(f"✅ Will split into {parts} parts. It's now in the queue.")
-                    else:
-                        await m.reply_text("❌ Task expired.")
-                        bot.queue_manager.clear_edit_state(m.from_user.id)
-                except ValueError:
-                    await m.reply_text("❌ Please enter a valid number.")
-
-            elif state['state'] == 'WAITING_FOR_MERGE_FILES' and m.text.strip() == '/finish_merge':
-                if len(state['files']) < 1:
-                    await m.reply_text("⚠️ You haven't sent any additional videos to merge.")
-                    return
-                task = bot.queue_manager.all_tasks.get(state['msg_id'])
-                if task:
-                    task['merge_files'] = [f['file_id'] for f in state['files']]
-                    bot.queue_manager.clear_edit_state(m.from_user.id)
-                    await m.reply_text("✅ Merge compilation finished. It's now in the queue.")
-                else:
-                    await m.reply_text("❌ Task expired.")
-                    bot.queue_manager.clear_edit_state(m.from_user.id)
 
         
         async def _stats_wrapper(c, m):
@@ -206,7 +171,6 @@ class BotManager:
         bot.on_message(filters.command("queue") & filters.private)(_queue_wrapper)
         bot.on_message(filters.command("clear") & filters.private)(_clear_wrapper)
         bot.on_message((filters.video | filters.document) & filters.private)(_media_wrapper)
-        bot.on_message(filters.text & filters.private)(_text_wrapper)
         
         # Clone commands
         bot.on_message(filters.command("addbot") & filters.private)(_addbot_cmd)
