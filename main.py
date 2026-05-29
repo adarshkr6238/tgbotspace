@@ -11,6 +11,7 @@ from bot.services.queue_manager import QueueManager
 from bot.services.storage_service import setup_storage, cleanup_old_files
 from bot.handlers.commands import start_cmd, help_cmd, settings_cmd, set_preset_cb, stats_cmd, queue_cmd, clear_cmd
 from bot.handlers.media_handler import handle_video, download_stage, compression_stage
+from bot.handlers.edit_handler import handle_edit_menu, handle_edit_action
 from bot.utils.progress import cancel_task
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
@@ -98,7 +99,53 @@ class BotManager:
         async def _set_preset_wrapper(c, cb): await set_preset_cb(c, cb, bot.queue_manager)
         async def _queue_wrapper(c, m): await queue_cmd(c, m, bot.queue_manager)
         async def _clear_wrapper(c, m): await clear_cmd(c, m, bot.queue_manager)
-        async def _media_wrapper(c, m): await handle_video(c, m, bot.queue_manager)
+        async def _media_wrapper(c, m):
+            state = bot.queue_manager.get_edit_state(m.from_user.id)
+            if state and state['state'] == 'WAITING_FOR_MERGE_FILES':
+                media = m.video or m.document
+                if media and (not m.document or (m.document.mime_type and m.document.mime_type.startswith("video/"))):
+                    bot.queue_manager.add_edit_file(m.from_user.id, "TBD", media.file_id)
+                    await m.reply_text("✅ Video registered for merging. Send another or type `/finish_merge`.")
+                else:
+                    await m.reply_text("❌ Please send a valid video file.")
+                return
+            await handle_video(c, m, bot.queue_manager)
+
+        async def _text_wrapper(c, m):
+            state = bot.queue_manager.get_edit_state(m.from_user.id)
+            if not state:
+                return
+                
+            if state['state'] == 'WAITING_FOR_SPLIT_COUNT':
+                try:
+                    parts = int(m.text.strip())
+                    if parts < 2 or parts > 10:
+                        await m.reply_text("⚠️ Please enter a number between 2 and 10.")
+                        return
+                    task = bot.queue_manager.all_tasks.get(state['msg_id'])
+                    if task:
+                        task['preset_override'] = f"edit_split_{parts}"
+                        bot.queue_manager.clear_edit_state(m.from_user.id)
+                        await m.reply_text(f"✅ Will split into {parts} parts. It's now in the queue.")
+                    else:
+                        await m.reply_text("❌ Task expired.")
+                        bot.queue_manager.clear_edit_state(m.from_user.id)
+                except ValueError:
+                    await m.reply_text("❌ Please enter a valid number.")
+
+            elif state['state'] == 'WAITING_FOR_MERGE_FILES' and m.text.strip() == '/finish_merge':
+                if len(state['files']) < 1:
+                    await m.reply_text("⚠️ You haven't sent any additional videos to merge.")
+                    return
+                task = bot.queue_manager.all_tasks.get(state['msg_id'])
+                if task:
+                    task['merge_files'] = [f['file_id'] for f in state['files']]
+                    bot.queue_manager.clear_edit_state(m.from_user.id)
+                    await m.reply_text("✅ Merge compilation finished. It's now in the queue.")
+                else:
+                    await m.reply_text("❌ Task expired.")
+                    bot.queue_manager.clear_edit_state(m.from_user.id)
+
         
         async def _stats_wrapper(c, m):
             # Also pass bot_manager to stats so owner sees active clones
@@ -118,6 +165,12 @@ class BotManager:
                 await cb.answer("✨ Quality Mode (/diff) enabled for this video!", show_alert=True)
             else:
                 await cb.answer("❌ Task not found or already processing.", show_alert=True)
+
+        async def _editmenu_cb_wrapper(c, cb):
+            await handle_edit_menu(c, cb, bot.queue_manager)
+
+        async def _edit_action_cb_wrapper(c, cb):
+            await handle_edit_action(c, cb, bot.queue_manager)
 
         # Clone Management Commands (Owner Only)
         async def _addbot_cmd(c, m):
@@ -147,10 +200,13 @@ class BotManager:
         bot.on_callback_query(filters.regex("^set_"))(_set_preset_wrapper)
         bot.on_callback_query(filters.regex("^cancel_"))(_cancel_cb_wrapper)
         bot.on_callback_query(filters.regex("^diff_"))(_diff_cb_wrapper)
+        bot.on_callback_query(filters.regex("^editmenu_"))(_editmenu_cb_wrapper)
+        bot.on_callback_query(filters.regex("^edit_"))(_edit_action_cb_wrapper)
         bot.on_message(filters.command("stats") & filters.private)(_stats_wrapper)
         bot.on_message(filters.command("queue") & filters.private)(_queue_wrapper)
         bot.on_message(filters.command("clear") & filters.private)(_clear_wrapper)
         bot.on_message((filters.video | filters.document) & filters.private)(_media_wrapper)
+        bot.on_message(filters.text & filters.private)(_text_wrapper)
         
         # Clone commands
         bot.on_message(filters.command("addbot") & filters.private)(_addbot_cmd)

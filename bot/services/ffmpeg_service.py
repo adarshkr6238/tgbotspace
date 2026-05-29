@@ -157,3 +157,139 @@ async def compress_video(input_path, output_path, preset_name, progress_callback
         return False, error_msg or f"FFmpeg exited with code {process.returncode}"
     
     return True, None
+
+async def merge_videos(input_paths, output_path, progress_callback, task):
+    # Create concat file
+    concat_file = os.path.join(os.path.dirname(output_path), "concat.txt")
+    total_duration = 0
+    with open(concat_file, "w") as f:
+        for p in input_paths:
+            f.write(f"file '{os.path.abspath(p)}'\n")
+            info = await get_video_info(p)
+            if info:
+                total_duration += float(info.get('format', {}).get('duration', 0))
+
+    cmd = [
+        'ffmpeg', '-y', '-f', 'concat', '-safe', '0', '-i', concat_file,
+        '-c', 'copy', output_path
+    ]
+    
+    process = await asyncio.create_subprocess_exec(*cmd, stderr=asyncio.subprocess.PIPE)
+    task['process'] = process
+    
+    while True:
+        try:
+            chunk = await process.stderr.read(1024)
+            if not chunk: break
+            line = chunk.decode('utf-8', errors='ignore')
+            if "time=" in line:
+                match = TIME_REGEX.search(line)
+                if match:
+                    h, m, s = match.group(1).split(":")
+                    current_time = int(h)*3600 + int(m)*60 + float(s)
+                    if total_duration > 0:
+                        await progress_callback(current_time, total_duration)
+        except: break
+    await process.wait()
+    task['process'] = None
+    try: os.remove(concat_file)
+    except: pass
+    return process.returncode == 0, ""
+
+async def split_video(input_path, output_dir, parts, progress_callback, task):
+    info = await get_video_info(input_path)
+    if not info: return [], "Could not read video"
+    duration = float(info.get('format', {}).get('duration', 0))
+    if duration == 0: return [], "Invalid duration"
+    
+    part_duration = duration / parts
+    output_files = []
+    
+    base_name = os.path.splitext(os.path.basename(input_path))[0]
+    ext = os.path.splitext(input_path)[1]
+
+    for i in range(parts):
+        start_time = i * part_duration
+        out_file = os.path.join(output_dir, f"{base_name}_part{i+1}{ext}")
+        output_files.append(out_file)
+        
+        cmd = [
+            'ffmpeg', '-y', '-i', input_path, 
+            '-ss', str(start_time), '-t', str(part_duration), 
+            '-c', 'copy', out_file
+        ]
+        process = await asyncio.create_subprocess_exec(*cmd, stderr=asyncio.subprocess.PIPE)
+        task['process'] = process
+        while True:
+            try:
+                chunk = await process.stderr.read(1024)
+                if not chunk: break
+                line = chunk.decode('utf-8', errors='ignore')
+                if "time=" in line:
+                    match = TIME_REGEX.search(line)
+                    if match:
+                        h, m, s = match.group(1).split(":")
+                        current_time = int(h)*3600 + int(m)*60 + float(s)
+                        await progress_callback(current_time + start_time, duration)
+            except: break
+        await process.wait()
+        
+    task['process'] = None
+    return output_files, ""
+
+async def remove_stream(input_path, output_path, stream_index, progress_callback, task):
+    info = await get_video_info(input_path)
+    if not info: return False, "Could not read video"
+    duration = float(info.get('format', {}).get('duration', 0))
+    
+    cmd = [
+        'ffmpeg', '-y', '-i', input_path, 
+        '-map', '0', f'-map', f'-0:{stream_index}', 
+        '-c', 'copy', output_path
+    ]
+    process = await asyncio.create_subprocess_exec(*cmd, stderr=asyncio.subprocess.PIPE)
+    task['process'] = process
+    while True:
+        try:
+            chunk = await process.stderr.read(1024)
+            if not chunk: break
+            line = chunk.decode('utf-8', errors='ignore')
+            if "time=" in line:
+                match = TIME_REGEX.search(line)
+                if match:
+                    h, m, s = match.group(1).split(":")
+                    current_time = int(h)*3600 + int(m)*60 + float(s)
+                    if duration > 0: await progress_callback(current_time, duration)
+        except: break
+    await process.wait()
+    task['process'] = None
+    return process.returncode == 0, ""
+
+async def mux_audio_video(video_path, audio_path, output_path, progress_callback, task):
+    info = await get_video_info(video_path)
+    if not info: return False, "Could not read video"
+    duration = float(info.get('format', {}).get('duration', 0))
+    
+    cmd = [
+        'ffmpeg', '-y', '-i', video_path, '-i', audio_path,
+        '-c:v', 'copy', '-c:a', 'aac', '-map', '0:v:0', '-map', '1:a:0',
+        '-shortest', output_path
+    ]
+    process = await asyncio.create_subprocess_exec(*cmd, stderr=asyncio.subprocess.PIPE)
+    task['process'] = process
+    while True:
+        try:
+            chunk = await process.stderr.read(1024)
+            if not chunk: break
+            line = chunk.decode('utf-8', errors='ignore')
+            if "time=" in line:
+                match = TIME_REGEX.search(line)
+                if match:
+                    h, m, s = match.group(1).split(":")
+                    current_time = int(h)*3600 + int(m)*60 + float(s)
+                    if duration > 0: await progress_callback(current_time, duration)
+        except: break
+    await process.wait()
+    task['process'] = None
+    return process.returncode == 0, ""
+

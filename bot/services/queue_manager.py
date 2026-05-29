@@ -21,6 +21,9 @@ class QueueManager:
         self.waiting_for_slot_count = 0
         self.all_tasks = {} # Registry: msg_id -> task
         
+        # Interactive Editing States: user_id -> {state: str, files: list, params: dict, msg_id: int}
+        self.edit_sessions = {}
+        
         self.settings_file = "user_settings.json" 
         self.user_settings = self._load_settings()
 
@@ -181,6 +184,35 @@ class QueueManager:
 
     def get_queue_status(self):
         return len(self.all_tasks)
+
+    # --- Edit Session Management ---
+    def set_edit_state(self, user_id, state, msg_id, params=None):
+        self.edit_sessions[user_id] = {
+            'state': state,
+            'files': [],
+            'params': params or {},
+            'msg_id': msg_id
+        }
+
+    def get_edit_state(self, user_id):
+        return self.edit_sessions.get(user_id)
+
+    def add_edit_file(self, user_id, file_path, file_id=None):
+        session = self.edit_sessions.get(user_id)
+        if session:
+            session['files'].append({'path': file_path, 'file_id': file_id})
+            return True
+        return False
+
+    def clear_edit_state(self, user_id):
+        session = self.edit_sessions.pop(user_id, None)
+        if session:
+            for f in session['files']:
+                if 'path' in f and os.path.exists(f['path']):
+                    try: os.remove(f['path'])
+                    except: pass
+        return session
+    # --------------------------------
 
     def get_current_task_info(self):
         if self.active_compression_task:

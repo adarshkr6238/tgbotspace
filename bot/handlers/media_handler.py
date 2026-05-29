@@ -5,7 +5,7 @@ from pyrogram import Client, filters
 from pyrogram.types import Message, InlineKeyboardMarkup, InlineKeyboardButton
 from bot.config.config import Config
 from bot.utils.progress import progress_bar, format_bytes, is_cancelled, clear_cancel_flag, truncate_text
-from bot.services.ffmpeg_service import compress_video, get_video_info
+from bot.services.ffmpeg_service import compress_video, get_video_info, split_video, merge_videos, remove_stream, mux_audio_video
 from bot.services.storage_service import setup_storage
 
 logger = logging.getLogger(__name__)
@@ -66,6 +66,7 @@ async def handle_video(client, message, queue_manager):
         
         markup = InlineKeyboardMarkup([
             [InlineKeyboardButton("✨ /diff Quality Mode", callback_data=f"diff_{status_msg.id}")],
+            [InlineKeyboardButton("✏️ Edit File", callback_data=f"editmenu_{status_msg.id}")],
             [InlineKeyboardButton("❌ Cancel", callback_data=f"cancel_{status_msg.id}")]
         ])
         
@@ -97,6 +98,7 @@ async def download_stage(client, task):
 
     markup = InlineKeyboardMarkup([
         [InlineKeyboardButton("✨ /diff Quality Mode", callback_data=f"diff_{msg_id}")],
+        [InlineKeyboardButton("✏️ Edit File", callback_data=f"editmenu_{msg_id}")],
         [InlineKeyboardButton("❌ Cancel", callback_data=f"cancel_{msg_id}")]
     ])
 
@@ -158,7 +160,7 @@ async def compression_stage(client, task, queue_manager):
     markup = InlineKeyboardMarkup([[InlineKeyboardButton("❌ Cancel", callback_data=f"cancel_{msg_id}")]])
 
     await status_msg.edit_text(
-        f"⚙️ Compressing ({preset_name})...",
+        f"⚙️ Processing ({preset_name})...",
         reply_markup=markup
     )
     start_time = time.time()
@@ -168,17 +170,43 @@ async def compression_stage(client, task, queue_manager):
         nonlocal last_update
         if task.get('is_paused'):
             return last_update
-        last_update = await progress_bar(current, total, f"Compressing ({preset_name})", status_msg, start_time, last_update, task, reply_markup=markup)
+        last_update = await progress_bar(current, total, f"Processing ({preset_name})", status_msg, start_time, last_update, task, reply_markup=markup)
 
     try:
-        success, error_msg = await compress_video(input_path, output_path, preset_name, comp_progress, task)
+        success = False
+        error_msg = ""
+        output_files = [output_path] # Default single output
+        
+        if preset_name.startswith("edit_split_"):
+            parts = int(preset_name.split("_")[2])
+            out_files, error_msg = await split_video(input_path, Config.TEMP_DIR, parts, comp_progress, task)
+            if out_files:
+                output_files = out_files
+                success = True
+        elif preset_name == "edit_vmerge":
+            input_paths = [input_path]
+            # Download all files registered for merge
+            if 'merge_files' in task:
+                for idx, file_id in enumerate(task['merge_files']):
+                    await status_msg.edit_text(f"📥 Downloading part {idx+2}...")
+                    dl_path = os.path.join(Config.DOWNLOAD_DIR, f"{msg_id}_merge_{idx}.mp4")
+                    await client.download_media(file_id, file_name=dl_path)
+                    input_paths.append(dl_path)
+                    task['paths'].append(dl_path)
+            await status_msg.edit_text(f"⚙️ Merging {len(input_paths)} videos...", reply_markup=markup)
+            success, error_msg = await merge_videos(input_paths, output_path, comp_progress, task)
+        elif preset_name.startswith("edit_"):
+            success = False
+            error_msg = "This specific edit feature is still being integrated."
+        else:
+            success, error_msg = await compress_video(input_path, output_path, preset_name, comp_progress, task)
         
         if is_cancelled(msg_id):
              raise Exception("CANCELLED")
              
         if not success:
-            await status_msg.edit_text("❌ **Compression Failed.** Sending logs...")
-            await send_log_file(message, error_msg, "Compression Error")
+            await status_msg.edit_text("❌ **Processing Failed.** Sending logs...")
+            await send_log_file(message, error_msg, "Processing Error")
             return
 
         await status_msg.edit_text(
@@ -193,33 +221,40 @@ async def compression_stage(client, task, queue_manager):
             last_update = await progress_bar(current, total, "Uploading", status_msg, start_time, last_update, task, reply_markup=markup)
 
         orig_size = os.path.getsize(input_path)
-        comp_size = os.path.getsize(output_path)
         
-        if comp_size >= orig_size:
-            await status_msg.edit_text("⚠️ Compressed file was larger. Sending original.")
-            upload_path = input_path
-            final_size = orig_size
-            saved_str = "0% (Already optimized)"
-        else:
-            upload_path = output_path
-            final_size = comp_size
-            saved = (orig_size - comp_size) / orig_size * 100
-            saved_str = f"{saved:.1f}%"
+        # Upload loop for multiple files (like split)
+        for i, out_file in enumerate(output_files):
+            if not os.path.exists(out_file): continue
+            
+            comp_size = os.path.getsize(out_file)
+            
+            if not preset_name.startswith("edit_") and comp_size >= orig_size:
+                await status_msg.edit_text("⚠️ Compressed file was larger. Sending original.")
+                upload_path = input_path
+                final_size = orig_size
+                saved_str = "0% (Already optimized)"
+            else:
+                upload_path = out_file
+                final_size = comp_size
+                saved = (orig_size - comp_size) / orig_size * 100 if orig_size else 0
+                saved_str = f"{saved:.1f}%"
 
-        caption = (
-            f"✅ **Processing Complete**\n\n"
-            f"📦 **Original:** {format_bytes(orig_size)}\n"
-            f"📉 **Final:** {format_bytes(final_size)}\n"
-            f"✨ **Saved:** {saved_str}\n"
-            f"🛠️ **Preset:** {preset_name}"
-        )
+            caption = (
+                f"✅ **Processing Complete** {f'({i+1}/{len(output_files)})' if len(output_files) > 1 else ''}\n\n"
+                f"📦 **Original:** {format_bytes(orig_size)}\n"
+                f"📉 **Final:** {format_bytes(final_size)}\n"
+            )
+            if not preset_name.startswith("edit_"):
+                caption += f"✨ **Saved:** {saved_str}\n"
+            caption += f"🛠️ **Preset/Mode:** {preset_name}"
 
-        await message.reply_video(
-            video=upload_path,
-            caption=caption,
-            quote=True,
-            progress=up_progress
-        )
+            await message.reply_video(
+                video=upload_path,
+                caption=caption,
+                quote=True,
+                progress=up_progress
+            )
+            
         await status_msg.delete()
         clear_cancel_flag(msg_id)
         import gc
