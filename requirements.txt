@@ -1,5 +1,5 @@
-telethon
-cryptg
+pyrogram
+tgcrypto
 aiohttp
 python-dotenv
 uvloop
