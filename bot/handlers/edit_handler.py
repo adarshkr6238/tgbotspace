@@ -17,6 +17,8 @@ async def handle_edit_menu(client, callback_query, queue_manager):
         await callback_query.answer("❌ Task not found.", show_alert=True)
         return
 
+    task['is_editing'] = True
+
     await callback_query.message.edit_text(
         "🛠 **Edit File Menu**\n\nChoose an editing option. This will bypass normal compression.",
         reply_markup=get_edit_menu_markup(msg_id)
@@ -32,6 +34,7 @@ async def handle_edit_action(client, callback_query, queue_manager):
         return
 
     if action == "back":
+        task['is_editing'] = False
         markup = InlineKeyboardMarkup([
             [InlineKeyboardButton("✨ /diff Quality Mode", callback_data=f"diff_{msg_id}")],
             [InlineKeyboardButton("✏️ Edit File", callback_data=f"editmenu_{msg_id}")],

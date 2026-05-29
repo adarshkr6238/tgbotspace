@@ -132,6 +132,10 @@ class QueueManager:
             # Wait if another task is still active (wasn't preempted)
             while self.active_compression_task and not self.active_compression_task.get('is_paused', False):
                 await asyncio.sleep(1)
+                
+            # Wait if the user is currently interacting with the edit menu for this task
+            while next_task.get('is_editing', False):
+                await asyncio.sleep(1)
             
             self.active_compression_task = next_task
             asyncio.create_task(self._run_compression_task(next_task))
@@ -193,6 +197,8 @@ class QueueManager:
             'params': params or {},
             'msg_id': msg_id
         }
+        task = self.all_tasks.get(msg_id)
+        if task: task['is_editing'] = True
 
     def get_edit_state(self, user_id):
         return self.edit_sessions.get(user_id)
@@ -207,6 +213,8 @@ class QueueManager:
     def clear_edit_state(self, user_id):
         session = self.edit_sessions.pop(user_id, None)
         if session:
+            task = self.all_tasks.get(session['msg_id'])
+            if task: task['is_editing'] = False
             for f in session['files']:
                 if 'path' in f and os.path.exists(f['path']):
                     try: os.remove(f['path'])

@@ -23,6 +23,9 @@ async def progress_bar(current, total, status_text, message, start_time, last_up
 
     if msg_id in _cancelled_tasks:
         raise Exception("CANCELLED")
+        
+    if task and task.get('is_editing'):
+        return last_update_time
 
     now = time.time()
     percentage = current * 100 / total if total else 0
