@@ -119,6 +119,8 @@ async def handle_edit_action(client, callback_query, queue_manager):
             return
             
         task['merge_files'] = [f['file_id'] for f in state['files']]
+        task['preset_override'] = "edit_vmerge" # Match media_handler.py
+        task['is_editing'] = False
         queue_manager.clear_edit_state(task['user_id'])
         
         # Proceed to queue
@@ -130,7 +132,8 @@ async def handle_edit_action(client, callback_query, queue_manager):
         
     elif action == "dosplit":
         parts = int(data_parts[2])
-        task['preset_override'] = f"edit_split_{parts}"
+        task['preset_override'] = f"edit_split_{parts}" # Match media_handler.py
+        task['is_editing'] = False
         queue_manager.clear_edit_state(task['user_id'])
         
         # Proceed to queue
