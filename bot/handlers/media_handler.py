@@ -250,11 +250,28 @@ async def compression_stage(client, task, queue_manager):
             # Download all files registered for merge
             if 'merge_files' in task:
                 for idx, file_id in enumerate(task['merge_files']):
-                    await status_msg.edit_text(f"📥 Downloading part {idx+2}...")
                     dl_path = os.path.join(Config.DOWNLOAD_DIR, f"{msg_id}_merge_{idx}.mp4")
-                    await client.download_media(file_id, file_name=dl_path)
+                    
+                    # Create a progress wrapper for each part
+                    part_start_time = time.time()
+                    part_last_update = part_start_time
+                    async def part_down_progress(current, total):
+                        nonlocal part_last_update
+                        part_last_update = await progress_bar(
+                            current, total, f"Downloading Part {idx+2}", 
+                            status_msg, part_start_time, part_last_update, task, reply_markup=markup
+                        )
+                    
+                    # Search for the message containing this file_id to use fast_download
+                    # For now, fallback to client.download_media if message not easily accessible
+                    # but wrapped in our progress logic
+                    await client.download_media(file_id, file_name=dl_path, progress=part_down_progress)
+                    
                     input_paths.append(dl_path)
                     task['paths'].append(dl_path)
+            
+            start_time = time.time()
+            last_update = start_time
             await status_msg.edit_text(f"⚙️ Merging {len(input_paths)} videos...", reply_markup=markup)
             success, error_msg = await merge_videos(input_paths, output_path, comp_progress, task)
         elif preset_name.startswith("edit_stream_"):
@@ -269,10 +286,22 @@ async def compression_stage(client, task, queue_manager):
             
         elif preset_name == "edit_avmerge":
             if 'audio_file' in task:
-                await status_msg.edit_text("📥 Downloading audio file...", reply_markup=markup)
                 audio_path = os.path.join(Config.DOWNLOAD_DIR, f"{msg_id}_audio.m4a")
-                await client.download_media(task['audio_file'], file_name=audio_path)
+                
+                audio_start_time = time.time()
+                audio_last_update = audio_start_time
+                async def audio_down_progress(current, total):
+                    nonlocal audio_last_update
+                    audio_last_update = await progress_bar(
+                        current, total, "Downloading Audio", 
+                        status_msg, audio_start_time, audio_last_update, task, reply_markup=markup
+                    )
+
+                await client.download_media(task['audio_file'], file_name=audio_path, progress=audio_down_progress)
                 task['paths'].append(audio_path)
+                
+                start_time = time.time()
+                last_update = start_time
                 await status_msg.edit_text("🎶 Merging Audio and Video...", reply_markup=markup)
                 success, error_msg = await mux_audio_video(input_path, audio_path, output_path, comp_progress, task)
             else:

@@ -29,7 +29,7 @@ async def fast_download(client: Client, message, file_path: str, progress: Optio
         return await client.download_media(message, file_name=file_path, progress=progress)
 
     # Resolve the file location for the raw API
-    if file_id_obj.file_type in (types.InputDocumentFileLocation, types.InputPhotoFileLocation):
+    if file_id_obj.file_type in (types.InputDocumentFileLocation, types.InputPhotoFileLocation) or True:
          location = types.InputDocumentFileLocation(
              id=file_id_obj.media_id,
              access_hash=file_id_obj.access_hash,
@@ -72,8 +72,11 @@ async def fast_download(client: Client, message, file_path: str, progress: Optio
                         downloaded_size += len(result.bytes)
                         
                         if progress:
-                            # Run progress in background to not block downloads
-                            asyncio.create_task(progress(downloaded_size, file_size))
+                            # Run progress in background but add a small sleep to not starve other tasks
+                            async def wrapped_progress():
+                                await progress(downloaded_size, file_size)
+                                await asyncio.sleep(0)
+                            asyncio.create_task(wrapped_progress())
                 except Exception as e:
                     logger.error(f"Error downloading chunk {part_num}: {e}")
                     raise e
@@ -139,7 +142,10 @@ async def fast_upload(client: Client, file_path: str, progress: Optional[Callabl
                     
                     uploaded_size += len(chunk)
                     if progress:
-                        asyncio.create_task(progress(uploaded_size, file_size))
+                        async def wrapped_progress():
+                            await progress(uploaded_size, file_size)
+                            await asyncio.sleep(0)
+                        asyncio.create_task(wrapped_progress())
                         
                 except Exception as e:
                     logger.error(f"Error uploading chunk {part_num}: {e}")
