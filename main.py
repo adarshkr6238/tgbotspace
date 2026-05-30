@@ -110,7 +110,18 @@ class BotManager:
                     media = m.video or m.document
                     if media and (not m.document or (m.document.mime_type and m.document.mime_type.startswith("video/"))):
                         bot.queue_manager.add_edit_file(m.from_user.id, "TBD", media.file_id)
-                        await m.reply_text(f"✅ Video #{len(state['files']) + 1} registered. Send another or click **Finish & Merge**.")
+
+                        from pyrogram.types import InlineKeyboardMarkup, InlineKeyboardButton
+                        msg_id = state['msg_id']
+                        finish_markup = InlineKeyboardMarkup([
+                            [InlineKeyboardButton("✅ Finish & Merge", callback_data=f"edit_finishmerge_{msg_id}")],
+                            [InlineKeyboardButton("❌ Cancel", callback_data=f"cancel_{msg_id}")]
+                        ])
+
+                        await m.reply_text(
+                            f"✅ Video #{len(state['files']) + 1} registered. Send another or click **Finish & Merge**.",
+                            reply_markup=finish_markup
+                        )
                     else:
                         await m.reply_text("❌ Please send a valid video file.")
                     return
