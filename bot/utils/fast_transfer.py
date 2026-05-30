@@ -57,6 +57,7 @@ async def fast_download(client: Client, message, file_path: str, progress: Optio
         
         async def download_part(part_num, offset):
             nonlocal downloaded_size
+            nonlocal dc_id
             async with semaphore:
                 retries = 3
                 while retries > 0:
@@ -87,14 +88,12 @@ async def fast_download(client: Client, message, file_path: str, progress: Optio
                         elif isinstance(result, types.upload.FileMigrate):
                             # This should theoretically be handled by client.invoke(dc_id=...)
                             # but if we get it explicitly, update dc_id and retry
-                            nonlocal dc_id
                             dc_id = result.dc_id
                             continue
 
                     except Exception as e:
                         from pyrogram.errors import FileMigrate, FloodWait
                         if isinstance(e, FileMigrate):
-                            nonlocal dc_id
                             dc_id = e.value
                             continue
                         elif isinstance(e, FloodWait):
