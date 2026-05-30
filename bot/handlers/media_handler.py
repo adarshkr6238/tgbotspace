@@ -374,13 +374,12 @@ async def compression_stage(client, task, queue_manager):
                 caption += f"✨ **Saved:** {saved_str}\n"
             caption += f"🛠️ **Preset/Mode:** {preset_name}"
 
-            # Fast Upload
-            input_file = await fast_upload(client, upload_path, progress=up_progress)
-            
+            # Use native upload for reliability
             await message.reply_document(
-                document=input_file,
+                document=upload_path,
                 caption=caption,
-                quote=True
+                quote=True,
+                progress=up_progress
             )
             
         await status_msg.delete()
