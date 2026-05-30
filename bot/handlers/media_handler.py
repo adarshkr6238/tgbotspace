@@ -380,7 +380,8 @@ async def compression_stage(client, task, queue_manager):
             await message.reply_document(
                 document=input_file,
                 caption=caption,
-                quote=True
+                quote=True,
+                progress=up_progress
             )
             
         await status_msg.delete()

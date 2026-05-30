@@ -167,10 +167,10 @@ async def fast_upload(client: Client, file_path: str, progress: Optional[Callabl
                     
                     uploaded_size += len(chunk)
                     if progress:
-                        async def wrapped_progress():
-                            await progress(uploaded_size, file_size)
+                        async def wrapped_progress(current_size):
+                            await progress(current_size, file_size)
                             await asyncio.sleep(0)
-                        asyncio.create_task(wrapped_progress())
+                        asyncio.create_task(wrapped_progress(uploaded_size))
                         
                 except Exception as e:
                     logger.error(f"Error uploading chunk {part_num}: {e}")
