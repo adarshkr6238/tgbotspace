@@ -45,74 +45,75 @@ async def fast_download(client: Client, message, file_path: str, progress: Optio
     total_parts = math.ceil(file_size / CHUNK_SIZE)
     downloaded_size = 0
     
-    # We need to use the specific DC session
-    # Pyrogram manages this via client.invoke on different media_sessions
-    
-    with open(file_path, "wb") as f:
-        # Pre-allocate file size
-        f.seek(file_size - 1)
-        f.write(b"\0")
-        
-        semaphore = asyncio.Semaphore(MAX_WORKERS)
-        
-        async def download_part(part_num, offset):
-            nonlocal downloaded_size
-            nonlocal dc_id
-            async with semaphore:
-                retries = 3
-                while retries > 0:
-                    try:
-                        # invoke automatically handles DC migration if we provide dc_id
-                        result = await client.invoke(
-                            functions.upload.GetFile(
-                                location=location,
-                                offset=offset,
-                                limit=CHUNK_SIZE
-                            ),
-                            dc_id=dc_id
-                        )
-                        
-                        if isinstance(result, types.upload.File):
-                            f.seek(offset)
-                            f.write(result.bytes)
-                            downloaded_size += len(result.bytes)
-                            
-                            if progress:
-                                # Run progress in background but add a small sleep to not starve other tasks
-                                async def wrapped_progress():
-                                    await progress(downloaded_size, file_size)
-                                    await asyncio.sleep(0)
-                                asyncio.create_task(wrapped_progress())
-                            return # Success
-                            
-                        elif isinstance(result, types.upload.FileMigrate):
-                            # This should theoretically be handled by client.invoke(dc_id=...)
-                            # but if we get it explicitly, update dc_id and retry
-                            dc_id = result.dc_id
-                            continue
-
-                    except Exception as e:
-                        from pyrogram.errors import FileMigrate, FloodWait
-                        if isinstance(e, FileMigrate):
-                            dc_id = e.value
-                            continue
-                        elif isinstance(e, FloodWait):
-                            await asyncio.sleep(e.value)
-                            continue
-                        
-                        logger.error(f"Error downloading chunk {part_num}: {e}")
-                        retries -= 1
-                        if retries == 0: raise e
-                        await asyncio.sleep(1)
-
-        tasks = []
-        for i in range(total_parts):
-            offset = i * CHUNK_SIZE
-            tasks.append(asyncio.create_task(download_part(i, offset)))
+    try:
+        with open(file_path, "wb") as f:
+            # Pre-allocate file size
+            f.seek(file_size - 1)
+            f.write(b"\0")
             
-        await asyncio.gather(*tasks)
-        
-    return file_path
+            semaphore = asyncio.Semaphore(MAX_WORKERS)
+            
+            async def download_part(part_num, offset):
+                nonlocal downloaded_size
+                async with semaphore:
+                    retries = 3
+                    while retries > 0:
+                        try:
+                            # Pyrogram handles connection to correct DC internally if location is right
+                            result = await client.invoke(
+                                functions.upload.GetFile(
+                                    location=location,
+                                    offset=offset,
+                                    limit=CHUNK_SIZE
+                                )
+                            )
+                            
+                            if isinstance(result, types.upload.File):
+                                f.seek(offset)
+                                f.write(result.bytes)
+                                downloaded_size += len(result.bytes)
+                                
+                                if progress:
+                                    # Run progress in background but add a small sleep to not starve other tasks
+                                    async def wrapped_progress():
+                                        await progress(downloaded_size, file_size)
+                                        await asyncio.sleep(0)
+                                    asyncio.create_task(wrapped_progress())
+                                return # Success
+                                
+                            elif isinstance(result, types.upload.FileMigrate):
+                                # If we hit this, the manual location approach failed.
+                                # Raise to trigger the outer fallback.
+                                raise ValueError("FileMigrate received")
+
+                        except Exception as e:
+                            from pyrogram.errors import FileMigrate, FloodWait
+                            if isinstance(e, FileMigrate):
+                                # Raise to trigger the outer fallback
+                                raise ValueError("FileMigrate received")
+                            elif isinstance(e, FloodWait):
+                                await asyncio.sleep(e.value)
+                                continue
+                            
+                            logger.error(f"Error downloading chunk {part_num}: {e}")
+                            retries -= 1
+                            if retries == 0: raise e
+                            await asyncio.sleep(1)
+
+            tasks = []
+            for i in range(total_parts):
+                offset = i * CHUNK_SIZE
+                tasks.append(asyncio.create_task(download_part(i, offset)))
+                
+            await asyncio.gather(*tasks)
+            
+        return file_path
+    except Exception as e:
+        logger.warning(f"Fast download failed ({e}). Falling back to standard download.")
+        # Clean up partial file
+        if os.path.exists(file_path):
+            os.remove(file_path)
+        return await client.download_media(message, file_name=file_path, progress=progress)
 
 async def fast_upload(client: Client, file_path: str, progress: Optional[Callable] = None):
     """
