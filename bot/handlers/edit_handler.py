@@ -5,13 +5,58 @@ def build_stream_keyboard(streams, streams_to_remove, msg_id):
     for s in streams:
         idx = s.get('index', 0)
         codec_type = s.get('codec_type', 'unknown').upper()
+        codec_name = s.get('codec_name', '')
+        codec_long_name = s.get('codec_long_name', '')
         tags = s.get('tags', {})
         language = tags.get('language', 'und').upper()
         title = tags.get('title', '')
+        disposition = s.get('disposition', {})
+        is_default = disposition.get('default', 0) == 1
         
-        label = f"[{codec_type}] {language}"
-        if title:
-            label += f" - {title}"
+        if codec_type == 'AUDIO':
+            lang_display = language
+            if is_default:
+                lang_display += " (Default)"
+            
+            codec_display = f"{codec_long_name} ({codec_name})" if codec_long_name else codec_name
+            
+            channels = s.get('channels', '')
+            layout = s.get('channel_layout', '')
+            sr = s.get('sample_rate', '')
+            br = s.get('bit_rate', '')
+            
+            audio_details = codec_display
+            if layout:
+                audio_details += f" {layout}"
+            elif channels:
+                audio_details += f" {channels}ch"
+                
+            if br:
+                try:
+                    kbps = int(int(br) / 1000)
+                    audio_details += f" @ {kbps} kbps"
+                except: pass
+            
+            if sr:
+                try:
+                    khz = int(sr) // 1000
+                    audio_details += f", {khz}kHz"
+                except: pass
+                
+            label = f"{lang_display} - {audio_details}"
+            if title:
+                label = f"{lang_display} ({title}) - {audio_details}"
+        
+        elif codec_type == 'SUBTITLE':
+            label = f"[SUB] {language}"
+            if is_default:
+                label += " (Default)"
+            if title:
+                label += f" - {title}"
+        else:
+            label = f"[{codec_type}] {language}"
+            if title:
+                label += f" - {title}"
             
         if idx in streams_to_remove:
             label = f"✅ Remove: {label}"
