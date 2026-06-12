@@ -113,6 +113,7 @@ async def download_stage(client, task, queue_manager):
     media = message.video or message.document
     file_ext = os.path.splitext(media.file_name or "video.mp4")[1]
     input_path = os.path.join(Config.DOWNLOAD_DIR, f"{message.id}{file_ext}")
+    task['original_name'] = media.file_name or f"video_{message.id}{file_ext}"
     task['paths'].append(input_path)
     task['input_path'] = input_path
 
@@ -374,9 +375,22 @@ async def compression_stage(client, task, queue_manager):
                 caption += f"✨ **Saved:** {saved_str}\n"
             caption += f"🛠️ **Preset/Mode:** {preset_name}"
 
+            # Determine the filename to show in Telegram
+            show_name = os.path.basename(upload_path)
+            if not preset_name == "edit_rename":
+                orig_name = task.get('original_name')
+                if orig_name:
+                    orig_base = os.path.splitext(orig_name)[0]
+                    out_ext = os.path.splitext(upload_path)[1]
+                    if len(output_files) > 1:
+                        show_name = f"{orig_base}_part{i+1}{out_ext}"
+                    else:
+                        show_name = f"{orig_base}{out_ext}"
+
             # Use native upload for reliability
             await message.reply_document(
                 document=upload_path,
+                file_name=show_name,
                 caption=caption,
                 quote=True,
                 progress=up_progress
