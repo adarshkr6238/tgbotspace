@@ -96,13 +96,27 @@ class QueueManager:
             if is_cancelled(msg_id):
                 return
             await self.process_download(task)
-            await self.compression_queue.put((priority, count, task))
+            
+            # If the task is now waiting for user input (e.g. stream selection), 
+            # don't put it in the compression queue yet.
+            if not task.get('is_editing'):
+                await self.compression_queue.put((priority, count, task))
+            else:
+                logger.info(f"Task {msg_id} is being edited. Postponing compression queue.")
         except Exception as e:
             logger.error(f"Download task failed: {e}")
             self.cleanup_task(task)
         finally:
             self.active_download_count = max(0, self.active_download_count - 1)
             self.download_queue.task_done()
+
+    async def continue_task(self, task):
+        """Resume a task that was paused for editing and put it in the compression queue."""
+        duration = task.get('duration', 0)
+        priority = 1 if (0 < duration <= 300) else 2
+        self.task_counter += 1
+        await self.compression_queue.put((priority, self.task_counter, task))
+        logger.info(f"Task {task['status_msg'].id} continued and added to compression queue.")
 
     async def compression_worker(self):
         while True:
@@ -133,12 +147,9 @@ class QueueManager:
             while self.active_compression_task and not self.active_compression_task.get('is_paused', False):
                 await asyncio.sleep(1)
             
-            logger.info(f"Worker picked task {next_task['status_msg'].id}. Checking is_editing: {next_task.get('is_editing')}")
-            # Wait if the user is currently interacting with the edit menu for this task
-            while next_task.get('is_editing', False):
-                await asyncio.sleep(1)
+            # Note: We removed the HOL blocking while loop here. 
+            # Tasks should only be in this queue when ready to process.
             
-            logger.info(f"Task {next_task['status_msg'].id} is ready for compression. is_editing is now False.")
             self.active_compression_task = next_task
             asyncio.create_task(self._run_compression_task(next_task))
 

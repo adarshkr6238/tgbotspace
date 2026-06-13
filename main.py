@@ -134,6 +134,7 @@ class BotManager:
                             task['preset_override'] = "edit_avmerge"
                             bot.queue_manager.clear_edit_state(m.from_user.id)
                             await m.reply_text("✅ Audio received. A/V Merge task added to queue.")
+                            await bot.queue_manager.continue_task(task)
                         else:
                             await m.reply_text("❌ Task expired.")
                             bot.queue_manager.clear_edit_state(m.from_user.id)
@@ -154,6 +155,7 @@ class BotManager:
                     task['preset_override'] = "edit_rename"
                     bot.queue_manager.clear_edit_state(m.from_user.id)
                     await m.reply_text(f"✅ Renaming to `{new_name}`. Task added to queue.")
+                    await bot.queue_manager.continue_task(task)
                 else:
                     await m.reply_text("❌ Task expired.")
                     bot.queue_manager.clear_edit_state(m.from_user.id)

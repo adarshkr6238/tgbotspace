@@ -11,7 +11,7 @@ logger = logging.getLogger(__name__)
 
 # Configurable constants for transfer
 CHUNK_SIZE = 1024 * 1024  # 1MB per chunk (must be multiple of 1KB)
-MAX_WORKERS = 20         # Concurrent connections
+MAX_WORKERS = 8         # Concurrent connections
 
 async def fast_download(client: Client, message, file_path: str, progress: Optional[Callable] = None):
     """

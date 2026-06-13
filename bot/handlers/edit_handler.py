@@ -130,6 +130,7 @@ async def handle_edit_action(client, callback_query, queue_manager):
             f"📝 {action_name} registered. Added to queue (Position: {queue_manager.get_position(task)}).",
             reply_markup=markup
         )
+        await queue_manager.continue_task(task)
         return
     
     if action == "vmerge":
@@ -187,6 +188,7 @@ async def handle_edit_action(client, callback_query, queue_manager):
             f"📝 Merge compilation finished. Added to queue (Position: {queue_manager.get_position(task)}).",
             reply_markup=markup
         )
+        await queue_manager.continue_task(task)
         
     elif action == "dosplit":
         parts = int(data_parts[2])
@@ -200,6 +202,7 @@ async def handle_edit_action(client, callback_query, queue_manager):
             f"📝 Split into {parts} parts registered. Added to queue (Position: {queue_manager.get_position(task)}).",
             reply_markup=markup
         )
+        await queue_manager.continue_task(task)
         
     elif action == "stream":
         # We can't show streams until the file is downloaded.
@@ -256,6 +259,7 @@ async def handle_edit_action(client, callback_query, queue_manager):
             f"📝 Stream removal registered. Processing...",
             reply_markup=markup
         )
+        await queue_manager.continue_task(task)
 
 
     elif action == "avmerge":
