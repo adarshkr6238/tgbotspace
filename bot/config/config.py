@@ -28,7 +28,7 @@ class Config:
     DEFAULT_PRESET = "medium"
     
     # Progress bar update frequency (seconds)
-    PROGRESS_UPDATE_INTERVAL = 5
+    PROGRESS_UPDATE_INTERVAL = 6
     
     # Queue settings
     MAX_QUEUE_SIZE = 70

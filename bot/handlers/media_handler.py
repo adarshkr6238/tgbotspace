@@ -388,14 +388,30 @@ async def compression_stage(client, task, queue_manager):
                     else:
                         show_name = f"{orig_base}{out_ext}"
 
-            # Use native upload for reliability
-            await message.reply_document(
-                document=upload_path,
-                file_name=show_name,
-                caption=caption,
-                quote=True,
-                progress=up_progress
-            )
+            # Robust upload with FloodWait handling
+            from pyrogram.errors import FloodWait
+            import asyncio
+            retries = 3
+            while retries > 0:
+                try:
+                    await message.reply_document(
+                        document=upload_path,
+                        file_name=show_name,
+                        caption=caption,
+                        quote=True,
+                        progress=up_progress
+                    )
+                    break # Success
+                except FloodWait as e:
+                    logger.warning(f"FloodWait during upload. Waiting {e.value} seconds...")
+                    await status_msg.edit_text(f"⏳ Telegram Rate Limit hit. Waiting {e.value}s before uploading...")
+                    await asyncio.sleep(e.value)
+                    retries -= 1
+                except Exception as e:
+                    logger.error(f"Upload failed: {e}")
+                    if retries == 1: raise e
+                    await asyncio.sleep(5)
+                    retries -= 1
             
         await status_msg.delete()
         clear_cancel_flag(msg_id)

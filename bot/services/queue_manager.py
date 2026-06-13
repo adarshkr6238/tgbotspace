@@ -79,7 +79,8 @@ class QueueManager:
         self.waiting_for_slot_count += 1
         try:
             while True:
-                max_slots = 1 if (self.active_compression_task and not self.active_compression_task.get('is_paused')) else 2
+                # 3 concurrent downloads if no compression is running, otherwise 2.
+                max_slots = 2 if (self.active_compression_task and not self.active_compression_task.get('is_paused')) else 3
                 if self.active_download_count < max_slots:
                     break
                 from bot.utils.progress import is_cancelled
