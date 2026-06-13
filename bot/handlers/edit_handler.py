@@ -247,6 +247,8 @@ async def handle_edit_action(client, callback_query, queue_manager):
         indices_str = "_".join(map(str, streams_to_remove))
         task['preset_override'] = f"edit_stream_{indices_str}"
         task['is_editing'] = False
+        import logging
+        logging.getLogger(__name__).info(f"User finished stream selection for msg {msg_id}. is_editing set to False. Preset: {task['preset_override']}")
         queue_manager.clear_edit_state(task['user_id'])
         
         markup = InlineKeyboardMarkup([[InlineKeyboardButton("❌ Cancel", callback_data=f"cancel_{msg_id}")]])

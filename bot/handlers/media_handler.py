@@ -175,11 +175,12 @@ async def compression_stage(client, task, queue_manager):
     input_path = task['input_path']
     msg_id = status_msg.id
     
+    preset_name = task.get('preset_override') or queue_manager.get_user_preset(user_id)
+    logger.info(f"Starting compression_stage for msg {msg_id}. Preset: {preset_name}")
+    
     if is_cancelled(msg_id):
         await status_msg.edit_text("❌ Task Cancelled.")
         return
-
-    preset_name = task.get('preset_override') or queue_manager.get_user_preset(user_id)
     
     # Use input extension if it's an edit task, otherwise default to .mp4 for compression
     if preset_name.startswith("edit_"):

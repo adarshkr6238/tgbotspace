@@ -132,11 +132,13 @@ class QueueManager:
             # Wait if another task is still active (wasn't preempted)
             while self.active_compression_task and not self.active_compression_task.get('is_paused', False):
                 await asyncio.sleep(1)
-                
+            
+            logger.info(f"Worker picked task {next_task['status_msg'].id}. Checking is_editing: {next_task.get('is_editing')}")
             # Wait if the user is currently interacting with the edit menu for this task
             while next_task.get('is_editing', False):
                 await asyncio.sleep(1)
             
+            logger.info(f"Task {next_task['status_msg'].id} is ready for compression. is_editing is now False.")
             self.active_compression_task = next_task
             asyncio.create_task(self._run_compression_task(next_task))
 
