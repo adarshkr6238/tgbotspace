@@ -370,7 +370,7 @@ class BotManager:
         bot.on_callback_query(filters.regex("^editmenu_"))(_editmenu_cb_wrapper)
         bot.on_callback_query(filters.regex("^edit_"))(_edit_action_cb_wrapper)
         
-        bot.on_message((filters.video | filters.document) & filters.private)(
+        bot.on_message((filters.video | filters.document) & filters.private & filters.incoming)(
             _media_wrapper
         )
         bot.on_message(filters.text & filters.private)(_text_wrapper)
