@@ -51,7 +51,17 @@ async def handle_video(client, message, queue_manager):
             return
 
         user_id = message.from_user.id
-        logger.info(f"Received media from user {user_id} (Msg: {message.id})")
+        
+        # Authorization Check
+        is_auth = (
+            user_id == Config.OWNER_ID or 
+            user_id in Config.AUTH_USERS or 
+            message.chat.id == Config.GROUP_ID
+        )
+        if not is_auth:
+            return
+
+        logger.info(f"Received media from user {user_id} in chat {message.chat.id} (Msg: {message.id})")
 
         if not message.video and not message.document:
             return

@@ -352,17 +352,17 @@ class BotManager:
                     status += f"🔹 `{tkn[:10]}...` ({b.name})\n"
             await m.reply_text(status)
 
-        bot.on_message(filters.command("start") & filters.private)(start_cmd)
-        bot.on_message(filters.command("help") & filters.private)(help_cmd)
-        bot.on_message(filters.command("settings") & filters.private)(_settings_wrapper)
-        bot.on_message(filters.command("stats") & filters.private)(_stats_wrapper)
-        bot.on_message(filters.command("queue") & filters.private)(_queue_wrapper)
-        bot.on_message(filters.command("clear") & filters.private)(_clear_wrapper)
+        bot.on_message(filters.command("start") & (filters.private | filters.chat(Config.GROUP_ID)))(start_cmd)
+        bot.on_message(filters.command("help") & (filters.private | filters.chat(Config.GROUP_ID)))(help_cmd)
+        bot.on_message(filters.command("settings") & (filters.private | filters.chat(Config.GROUP_ID)))(_settings_wrapper)
+        bot.on_message(filters.command("stats") & (filters.private | filters.chat(Config.GROUP_ID)))(_stats_wrapper)
+        bot.on_message(filters.command("queue") & (filters.private | filters.chat(Config.GROUP_ID)))(_queue_wrapper)
+        bot.on_message(filters.command("clear") & (filters.private | filters.chat(Config.GROUP_ID)))(_clear_wrapper)
 
         # Clone commands MUST be registered before generic text handler
-        bot.on_message(filters.command("addbot") & filters.private)(_addbot_cmd)
-        bot.on_message(filters.command("delbot") & filters.private)(_delbot_cmd)
-        bot.on_message(filters.command("clones") & filters.private)(_clones_cmd)
+        bot.on_message(filters.command("addbot") & (filters.private | filters.chat(Config.GROUP_ID)))(_addbot_cmd)
+        bot.on_message(filters.command("delbot") & (filters.private | filters.chat(Config.GROUP_ID)))(_delbot_cmd)
+        bot.on_message(filters.command("clones") & (filters.private | filters.chat(Config.GROUP_ID)))(_clones_cmd)
 
         bot.on_callback_query(filters.regex("^settings_main$"))(_settings_cb_wrapper)
         bot.on_callback_query(filters.regex("^set_"))(_set_preset_wrapper)
@@ -371,10 +371,10 @@ class BotManager:
         bot.on_callback_query(filters.regex("^editmenu_"))(_editmenu_cb_wrapper)
         bot.on_callback_query(filters.regex("^edit_"))(_edit_action_cb_wrapper)
         
-        bot.on_message((filters.video | filters.document) & filters.private & filters.incoming)(
+        bot.on_message((filters.video | filters.document) & (filters.private | filters.chat(Config.GROUP_ID)) & filters.incoming)(
             _media_wrapper
         )
-        bot.on_message(filters.text & filters.private)(_text_wrapper)
+        bot.on_message(filters.text & (filters.private | filters.chat(Config.GROUP_ID)))(_text_wrapper)
 
         from pyrogram.errors import FloodWait
         retries = 3
