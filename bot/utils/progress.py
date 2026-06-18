@@ -100,11 +100,7 @@ async def progress_bar(
         markup = reply_markup or InlineKeyboardMarkup(
             [[InlineKeyboardButton("❌ Cancel", callback_data=f"cancel_{msg_id}")]]
         )
-        await message.edit_text(progress_str, reply_markup=markup)
-    except FloodWait as e:
-        logger.warning(
-            f"FloodWait in progress bar: skipping tick due to {e.value}s limit"
-        )
+        await safe_edit(message, progress_str, reply_markup=markup)
     except Exception:
         pass
     finally:

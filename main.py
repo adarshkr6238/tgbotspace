@@ -511,17 +511,23 @@ class BotManager:
             if node_name != "node2"
             else "https://shadow62-tgbotspace.hf.space/"
         )
+        failures = 0
         while True:
             try:
                 async with aiohttp.ClientSession() as session:
-                    async with session.get(target_url, timeout=5) as resp:
+                    async with session.get(target_url, timeout=10) as resp:
                         if resp.status == 200:
                             os.environ["OTHER_NODE_ALIVE"] = "1"
+                            failures = 0
                         else:
-                            os.environ["OTHER_NODE_ALIVE"] = "0"
+                            failures += 1
             except Exception:
+                failures += 1
+            
+            if failures >= 3:
                 os.environ["OTHER_NODE_ALIVE"] = "0"
-            await asyncio.sleep(30)
+            
+            await asyncio.sleep(20)
 
     async def _global_cleanup_loop(self):
         while True:
