@@ -15,6 +15,7 @@ from bot.services.ffmpeg_service import (
 from bot.services.storage_service import setup_storage
 from bot.utils.fast_transfer import fast_download
 from bot.utils.progress import (
+    safe_edit,
     clear_cancel_flag,
     format_bytes,
     is_cancelled,
@@ -151,27 +152,27 @@ async def handle_video(client, message, queue_manager):
         )
 
         try:
-            await status_msg.edit_text("⏳ Adding to queue...", reply_markup=markup)
+            await safe_edit(status_msg, "⏳ Adding to queue...", reply_markup=markup)
         except FloodWait as e:
             logger.warning(f"FloodWait on edit. Sleeping {e.value}s")
             await asyncio.sleep(e.value)
-            await status_msg.edit_text("⏳ Adding to queue...", reply_markup=markup)
+            await safe_edit(status_msg, "⏳ Adding to queue...", reply_markup=markup)
         except Exception:
             pass  # Ignore MessageNotModified or similar harmless errors
 
         success, pos = await queue_manager.add_task(task)
         if not success:
-            await status_msg.edit_text(f"❌ {pos}")
+            await safe_edit(status_msg, f"❌ {pos}")
             return
 
         try:
-            await status_msg.edit_text(
+            await safe_edit(status_msg, 
                 f"📝 Added to queue (Position: {pos})\n\nShort videos (<= 5 min) get priority!",
                 reply_markup=markup,
             )
         except FloodWait as e:
             await asyncio.sleep(e.value)
-            await status_msg.edit_text(
+            await safe_edit(status_msg, 
                 f"📝 Added to queue (Position: {pos})\n\nShort videos (<= 5 min) get priority!",
                 reply_markup=markup,
             )
@@ -187,7 +188,7 @@ async def download_stage(client, task, queue_manager):
     msg_id = status_msg.id
 
     if is_cancelled(msg_id):
-        await status_msg.edit_text("❌ Task Cancelled.")
+        await safe_edit(status_msg, "❌ Task Cancelled.")
         return
 
     markup = InlineKeyboardMarkup(
@@ -202,7 +203,7 @@ async def download_stage(client, task, queue_manager):
         ]
     )
 
-    await status_msg.edit_text("📥 Downloading...", reply_markup=markup)
+    await safe_edit(status_msg, "📥 Downloading...", reply_markup=markup)
     start_time = time.time()
     last_update = start_time
 
@@ -264,7 +265,7 @@ async def download_stage(client, task, queue_manager):
             state["streams_to_remove"] = set()
 
             markup = build_stream_keyboard(streams, state["streams_to_remove"], msg_id)
-            await status_msg.edit_text(
+            await safe_edit(status_msg, 
                 "✂️ **Stream Remover**\n\n"
                 "Analysis complete. Select the streams you want to **Remove**:\n"
                 "*(Click to toggle, then click Finish)*",
@@ -273,7 +274,7 @@ async def download_stage(client, task, queue_manager):
             # We don't advance to compression stage yet. The queue_manager will pause
             # because 'is_editing' is True.
         elif not task.get("is_editing"):
-            await status_msg.edit_text(
+            await safe_edit(status_msg, 
                 "✅ Ready for processing...",
                 reply_markup=InlineKeyboardMarkup(
                     [
@@ -287,9 +288,9 @@ async def download_stage(client, task, queue_manager):
             )
     except Exception as e:
         if str(e) == "CANCELLED":
-            await status_msg.edit_text("❌ Task Cancelled.")
+            await safe_edit(status_msg, "❌ Task Cancelled.")
         else:
-            await status_msg.edit_text("❌ **Download Failed.** Sending logs...")
+            await safe_edit(status_msg, "❌ **Download Failed.** Sending logs...")
             await send_log_file(message, str(e), "Download Error")
         raise e
 
@@ -305,7 +306,7 @@ async def compression_stage(client, task, queue_manager):
     logger.info(f"Starting compression_stage for msg {msg_id}. Preset: {preset_name}")
 
     if is_cancelled(msg_id):
-        await status_msg.edit_text("❌ Task Cancelled.")
+        await safe_edit(status_msg, "❌ Task Cancelled.")
         return
 
     # Use input extension if it's an edit task, otherwise default to .mp4 for compression
@@ -321,7 +322,7 @@ async def compression_stage(client, task, queue_manager):
         [[InlineKeyboardButton("❌ Cancel", callback_data=f"cancel_{msg_id}")]]
     )
 
-    await status_msg.edit_text(f"⚙️ Processing ({preset_name})...", reply_markup=markup)
+    await safe_edit(status_msg, f"⚙️ Processing ({preset_name})...", reply_markup=markup)
     start_time = time.time()
     last_update = start_time
 
@@ -354,7 +355,7 @@ async def compression_stage(client, task, queue_manager):
                 output_files = out_files
                 success = True
         elif preset_name == "edit_sample":
-            await status_msg.edit_text("🎬 Extracting sample...", reply_markup=markup)
+            await safe_edit(status_msg, "🎬 Extracting sample...", reply_markup=markup)
             success, error_msg = await extract_sample(
                 input_path, output_path, comp_progress, task
             )
@@ -362,7 +363,7 @@ async def compression_stage(client, task, queue_manager):
             import shutil
             import uuid
 
-            await status_msg.edit_text(
+            await safe_edit(status_msg, 
                 "🔗 Generating secure direct link...", reply_markup=markup
             )
 
@@ -426,7 +427,7 @@ async def compression_stage(client, task, queue_manager):
 
             start_time = time.time()
             last_update = start_time
-            await status_msg.edit_text(
+            await safe_edit(status_msg, 
                 f"⚙️ Merging {len(input_paths)} videos...", reply_markup=markup
             )
             success, error_msg = await merge_videos(
@@ -439,7 +440,7 @@ async def compression_stage(client, task, queue_manager):
             else:
                 indices_str = preset_name.split("edit_stream_")[1]
                 indices = [int(x) for x in indices_str.split("_") if x]
-                await status_msg.edit_text(
+                await safe_edit(status_msg, 
                     f"✂️ Removing {len(indices)} streams...", reply_markup=markup
                 )
                 success, error_msg = await remove_stream(
@@ -475,7 +476,7 @@ async def compression_stage(client, task, queue_manager):
 
                 start_time = time.time()
                 last_update = start_time
-                await status_msg.edit_text(
+                await safe_edit(status_msg, 
                     "🎶 Merging Audio and Video...", reply_markup=markup
                 )
                 success, error_msg = await mux_audio_video(
@@ -486,7 +487,7 @@ async def compression_stage(client, task, queue_manager):
 
         elif preset_name == "edit_rename":
             new_name = task.get("new_name", "renamed_video.mp4")
-            await status_msg.edit_text(
+            await safe_edit(status_msg, 
                 f"📝 Renaming to {new_name}...", reply_markup=markup
             )
             # Rename doesn't need ffmpeg, just copy/move
@@ -513,11 +514,11 @@ async def compression_stage(client, task, queue_manager):
             raise Exception("CANCELLED")
 
         if not success:
-            await status_msg.edit_text("❌ **Processing Failed.** Sending logs...")
+            await safe_edit(status_msg, "❌ **Processing Failed.** Sending logs...")
             await send_log_file(message, error_msg, "Processing Error")
             return
 
-        await status_msg.edit_text("📤 Uploading...", reply_markup=markup)
+        await safe_edit(status_msg, "📤 Uploading...", reply_markup=markup)
         start_time = time.time()
         last_update = start_time
 
@@ -544,7 +545,7 @@ async def compression_stage(client, task, queue_manager):
             comp_size = os.path.getsize(out_file)
 
             if not preset_name.startswith("edit_") and comp_size >= orig_size:
-                await status_msg.edit_text(
+                await safe_edit(status_msg, 
                     "⚠️ Compressed file was larger. Sending original."
                 )
                 upload_path = input_path
@@ -597,7 +598,7 @@ async def compression_stage(client, task, queue_manager):
                     logger.warning(
                         f"FloodWait during upload. Waiting {e.value} seconds..."
                     )
-                    await status_msg.edit_text(
+                    await safe_edit(status_msg, 
                         f"⏳ Telegram Rate Limit hit. Waiting {e.value}s before uploading..."
                     )
                     await asyncio.sleep(e.value)
@@ -616,8 +617,8 @@ async def compression_stage(client, task, queue_manager):
         gc.collect()
     except Exception as e:
         if str(e) == "CANCELLED":
-            await status_msg.edit_text("❌ Task Cancelled.")
+            await safe_edit(status_msg, "❌ Task Cancelled.")
         else:
-            await status_msg.edit_text("❌ **System Error.** Sending logs...")
+            await safe_edit(status_msg, "❌ **System Error.** Sending logs...")
             await send_log_file(message, str(e), "System Exception")
         clear_cancel_flag(msg_id)

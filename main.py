@@ -291,9 +291,8 @@ class BotManager:
             msg_id = int(cb.data.split("_")[1])
             cancel_task(msg_id)
             await cb.answer("Cancelling task...", show_alert=True)
-            await cb.message.edit_text(
-                "❌ Cancellation requested. Moving to next task..."
-            )
+            from bot.utils.progress import safe_edit
+            await safe_edit(cb.message, "❌ Cancellation requested. Moving to next task...")
 
         async def _diff_cb_wrapper(c, cb):
             msg_id = int(cb.data.split("_")[1])

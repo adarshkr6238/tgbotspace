@@ -142,7 +142,7 @@ async def handle_edit_menu(client, callback_query, queue_manager):
 
     task["is_editing"] = True
 
-    await callback_query.message.edit_text(
+    await safe_edit(callback_query.message, 
         "🛠 **Edit File Menu**\n\nChoose an editing option. This will bypass normal compression.",
         reply_markup=get_edit_menu_markup(msg_id),
     )
@@ -175,7 +175,7 @@ async def handle_edit_action(client, callback_query, queue_manager):
                 [InlineKeyboardButton("❌ Cancel", callback_data=f"cancel_{msg_id}")],
             ]
         )
-        await callback_query.message.edit_text(
+        await safe_edit(callback_query.message, 
             f"📝 Added to queue (Position: {queue_manager.get_position(task)})\n\nShort videos (<= 5 min) get priority!",
             reply_markup=markup,
         )
@@ -196,7 +196,7 @@ async def handle_edit_action(client, callback_query, queue_manager):
         markup = InlineKeyboardMarkup(
             [[InlineKeyboardButton("❌ Cancel", callback_data=f"cancel_{msg_id}")]]
         )
-        await callback_query.message.edit_text(
+        await safe_edit(callback_query.message, 
             f"📝 {action_name} registered. Added to queue (Position: {queue_manager.get_position(task)}).",
             reply_markup=markup,
         )
@@ -220,7 +220,7 @@ async def handle_edit_action(client, callback_query, queue_manager):
             ]
         )
 
-        await callback_query.message.edit_text(
+        await safe_edit(callback_query.message, 
             "🔗 **Video Merger**\n\n"
             "1. Send the next video you want to merge.\n"
             "2. Repeat for all videos.\n"
@@ -260,7 +260,7 @@ async def handle_edit_action(client, callback_query, queue_manager):
             ]
         )
 
-        await callback_query.message.edit_text(
+        await safe_edit(callback_query.message, 
             "🔪 **Video Splitter**\n\n"
             "Select how many equal parts you want to split this video into:",
             reply_markup=split_markup,
@@ -288,7 +288,7 @@ async def handle_edit_action(client, callback_query, queue_manager):
         markup = InlineKeyboardMarkup(
             [[InlineKeyboardButton("❌ Cancel", callback_data=f"cancel_{msg_id}")]]
         )
-        await callback_query.message.edit_text(
+        await safe_edit(callback_query.message, 
             f"📝 Merge compilation finished. Added to queue (Position: {queue_manager.get_position(task)}).",
             reply_markup=markup,
         )
@@ -306,7 +306,7 @@ async def handle_edit_action(client, callback_query, queue_manager):
         markup = InlineKeyboardMarkup(
             [[InlineKeyboardButton("❌ Cancel", callback_data=f"cancel_{msg_id}")]]
         )
-        await callback_query.message.edit_text(
+        await safe_edit(callback_query.message, 
             f"📝 Split into {parts} parts registered. Added to queue (Position: {queue_manager.get_position(task)}).",
             reply_markup=markup,
         )
@@ -320,7 +320,7 @@ async def handle_edit_action(client, callback_query, queue_manager):
             # Download is already finished, show streams immediately
             from bot.services.ffmpeg_service import get_video_info
             
-            await callback_query.message.edit_text("⏳ Analyzing video streams...", reply_markup=None)
+            await safe_edit(callback_query.message, "⏳ Analyzing video streams...", reply_markup=None)
             info = await get_video_info(input_path)
             streams = info.get("streams", []) if info else []
             
@@ -330,7 +330,7 @@ async def handle_edit_action(client, callback_query, queue_manager):
             state["streams_to_remove"] = set()
 
             markup = build_stream_keyboard(streams, state["streams_to_remove"], msg_id)
-            await callback_query.message.edit_text(
+            await safe_edit(callback_query.message, 
                 "✂️ **Stream Remover**\n\n"
                 "Analysis complete. Select the streams you want to **Remove**:\n"
                 "*(Click to toggle, then click Finish)*",
@@ -344,7 +344,7 @@ async def handle_edit_action(client, callback_query, queue_manager):
                 task["user_id"], "WAITING_FOR_DOWNLOAD_TO_FINISH", msg_id
             )
 
-            await callback_query.message.edit_text(
+            await safe_edit(callback_query.message, 
                 "✂️ **Stream Remover**\n\n"
                 "Waiting for the video to finish downloading so I can analyze its tracks...\n"
                 "The menu will appear automatically.",
@@ -398,14 +398,14 @@ async def handle_edit_action(client, callback_query, queue_manager):
         markup = InlineKeyboardMarkup(
             [[InlineKeyboardButton("❌ Cancel", callback_data=f"cancel_{msg_id}")]]
         )
-        await callback_query.message.edit_text(
+        await safe_edit(callback_query.message, 
             f"📝 Stream removal registered. Processing...", reply_markup=markup
         )
         await queue_manager.continue_task(task)
 
     elif action == "avmerge":
         queue_manager.set_edit_state(task["user_id"], "WAITING_FOR_AUDIO_FILE", msg_id)
-        await callback_query.message.edit_text(
+        await safe_edit(callback_query.message, 
             "🎶 **Audio/Video Merger**\n\n"
             "Send the **Audio File** (MP3, M4A, etc.) you want to merge with this video.\n\n"
             "*Video is already registered.*",
@@ -416,7 +416,7 @@ async def handle_edit_action(client, callback_query, queue_manager):
 
     elif action == "rename":
         queue_manager.set_edit_state(task["user_id"], "WAITING_FOR_NEW_NAME", msg_id)
-        await callback_query.message.edit_text(
+        await safe_edit(callback_query.message, 
             "📝 **Video Renamer**\n\n"
             "This action requires text input.\n"
             "Please **Reply** to this message with the new filename (e.g., `my_vacation.mp4`).",

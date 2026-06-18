@@ -156,9 +156,8 @@ class QueueManager:
                             os.kill(process.pid, signal.SIGSTOP)
                             active["is_paused"] = True
                             self.paused_compression_tasks.append(active)
-                            await active["status_msg"].edit_text(
-                                f"⏸ **Paused ({active_pct:.1f}%):** Processing a shorter priority video first..."
-                            )
+                            from bot.utils.progress import safe_edit
+                            await safe_edit(active["status_msg"], f"⏸ **Paused ({active_pct:.1f}%):** Processing a shorter priority video first...")
                             self.active_compression_task = None
                         except Exception:
                             pass

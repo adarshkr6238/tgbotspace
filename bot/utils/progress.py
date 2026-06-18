@@ -2,7 +2,7 @@ import logging
 import time
 
 from bot.config.config import Config
-from pyrogram.errors import FloodWait
+from pyrogram.errors import FloodWait, MessageNotModified
 
 logger = logging.getLogger(__name__)
 
@@ -22,6 +22,21 @@ def is_cancelled(msg_id):
 
 def clear_cancel_flag(msg_id):
     _cancelled_tasks.discard(msg_id)
+
+
+async def safe_edit(message, text, reply_markup=None):
+    try:
+        await message.edit_text(text, reply_markup=reply_markup)
+    except MessageNotModified:
+        pass
+    except FloodWait as e:
+        await __import__("asyncio").sleep(e.value)
+        try:
+            await message.edit_text(text, reply_markup=reply_markup)
+        except Exception:
+            pass
+    except Exception:
+        pass
 
 
 async def progress_bar(
