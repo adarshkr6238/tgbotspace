@@ -78,12 +78,15 @@ async def handle_video(client, message, queue_manager):
         # (msg_id % 2) is 0 or 1. We map node 1 to 1 and node 2 to 0.
         # Use node_num - 1 to get 0 for node1 and 1 for node2 (more standard)
         is_my_turn = (msg_id_val % 2) == ((node_num - 1) % 2)
+        other_node_alive = os.environ.get("OTHER_NODE_ALIVE", "1") == "1"
 
-        if not is_my_turn:
+        if not is_my_turn and other_node_alive:
             logger.info(
                 f"Node {node_name} ignoring msg {msg_id_val} (Node {(msg_id_val % 2) + 1}'s turn)."
             )
             return
+        elif not is_my_turn and not other_node_alive:
+            logger.info(f"Node {node_name} processing msg {msg_id_val} as fallback (Other node is offline).")
 
         import asyncio
 

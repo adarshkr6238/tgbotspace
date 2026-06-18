@@ -167,6 +167,8 @@ class BotManager:
 
         # Global cleanup loop
         asyncio.create_task(self._global_cleanup_loop())
+        # Cluster health ping loop
+        asyncio.create_task(self._cluster_health_loop())
 
     async def start_bot(self, token, name):
         if token in self.bots:
@@ -501,6 +503,26 @@ class BotManager:
             f"└ **Compression Queue:** {comp_queue}"
         )
         await message.reply_text(status)
+
+    async def _cluster_health_loop(self):
+        import aiohttp
+        node_name = os.environ.get("SESSION_NAME", "node1")
+        target_url = (
+            "https://shadow62-tgbotspace2.hf.space/"
+            if node_name != "node2"
+            else "https://shadow62-tgbotspace.hf.space/"
+        )
+        while True:
+            try:
+                async with aiohttp.ClientSession() as session:
+                    async with session.get(target_url, timeout=5) as resp:
+                        if resp.status == 200:
+                            os.environ["OTHER_NODE_ALIVE"] = "1"
+                        else:
+                            os.environ["OTHER_NODE_ALIVE"] = "0"
+            except Exception:
+                os.environ["OTHER_NODE_ALIVE"] = "0"
+            await asyncio.sleep(30)
 
     async def _global_cleanup_loop(self):
         while True:
