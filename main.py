@@ -167,8 +167,6 @@ class BotManager:
 
         # Global cleanup loop
         asyncio.create_task(self._global_cleanup_loop())
-        # Cluster health ping loop
-        asyncio.create_task(self._cluster_health_loop())
 
     async def start_bot(self, token, name):
         if token in self.bots:

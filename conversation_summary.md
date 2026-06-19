@@ -22,6 +22,13 @@ This document serves as a record of the architecture changes, bug fixes, and fea
 *   **Persistence:** Cloned tokens are saved securely to `cloned_bots.json` so they automatically revive upon server restarts.
 *   **Cluster Propagation Sync:** Implemented internal `/addbot` and `/delbot` health check endpoints. Modifying clones on either node now instantly propagates across the entire cluster network to ensure cloned bots run on all nodes simultaneously and never miss half the stream.
 
+## 3. Group Support & Authorization
+*   **Goal:** Enable the bot to function in specific Telegram groups.
+*   **Action:** Added `GROUP_ID` to configuration and updated message filters.
+*   **Authorization:** 
+    *   The bot now processes videos in the authorized group (`-1002335588415`) and private chats.
+    *   Implemented explicit authorization checks to ensure only authorized users or group members can trigger processing, protecting server resources.
+
 ## 3. Resilience & Rate Limit Handling
 *   **FloodWait Mitigation:** Addressed severe Telegram rate limits (`[420 FLOOD_WAIT_X]`) that were causing the bot to crash or ignore messages. Wrapped startup initialization and progress message edits in `try/except FloodWait` blocks. The bot now gracefully sleeps through the penalty duration instead of crashing.
 *   **Cross-Node Clear:** Implemented a unified `/clear` command. Node 1 uses an internal API endpoint on Node 2's health server to wipe queues and temp files across the entire cluster simultaneously.

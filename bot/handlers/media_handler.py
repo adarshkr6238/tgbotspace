@@ -89,19 +89,31 @@ async def handle_video(client, message, queue_manager):
         # (msg_id % 2) is 0 or 1. We map node 1 to 1 and node 2 to 0.
         # Use node_num - 1 to get 0 for node1 and 1 for node2 (more standard)
         is_my_turn = (msg_id_val % 2) == ((node_num - 1) % 2)
-        other_node_alive = os.environ.get("OTHER_NODE_ALIVE", "1") == "1"
-
-        if not is_my_turn and other_node_alive:
-            logger.info(
-                f"Node {node_name} ignoring msg {msg_id_val} (Node {(msg_id_val % 2) + 1}'s turn)."
-            )
-            return
-        elif not is_my_turn and not other_node_alive:
-            logger.info(f"Node {node_name} processing msg {msg_id_val} as fallback (Other node is offline).")
 
         import asyncio
-
         from pyrogram.errors import FloodWait
+
+        if not is_my_turn:
+            logger.info(f"Node {node_name} entering standby for msg {msg_id_val} (Node {(msg_id_val % 2) + 1}'s turn).")
+            # Reactive Fallback: Wait to see if the assigned node handles it
+            await asyncio.sleep(15)
+            
+            # Check if any bot in our cluster already replied to this message
+            already_claimed = False
+            try:
+                async for msg in client.get_chat_history(message.chat.id, limit=20):
+                    if msg.reply_to_message_id == message.id and msg.from_user and msg.from_user.is_bot:
+                        # Someone (likely the other node) is already on it
+                        already_claimed = True
+                        break
+            except Exception as e:
+                logger.error(f"Error checking fallback status: {e}")
+            
+            if already_claimed:
+                logger.info(f"Node {node_name} skipping msg {msg_id_val}: already claimed by other node.")
+                return
+            
+            logger.warning(f"Node {node_name} taking over msg {msg_id_val}: assigned node failed to respond in 15s.")
 
         status_msg = None
         try:
