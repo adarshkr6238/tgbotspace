@@ -152,15 +152,14 @@ async def handle_edit_menu(client, callback_query, queue_manager):
                 async with session.get(f"{target_url}tasks/{msg_id}", timeout=5) as resp:
                     logger.info(f"Remote check for task {msg_id} returned status: {resp.status}")
                     if resp.status == 200:
-                        await callback_query.answer("🔗 Task found on remote node. Redirecting...", show_alert=True)
+                        await callback_query.answer("🔗 Task found on remote node. Please use the button on the message from that node.", show_alert=True)
                         return
         except Exception as e:
             logger.error(f"Error checking remote task {msg_id}: {e}")
-            pass
 
     if not task:
         logger.warning(f"Task {msg_id} not found on any node.")
-        await callback_query.answer("❌ Task not found.", show_alert=True)
+        await callback_query.answer("❌ Task not found. The download may have completed and the task registry cleaned up.", show_alert=True)
         return
 
     task["is_editing"] = True
@@ -169,6 +168,7 @@ async def handle_edit_menu(client, callback_query, queue_manager):
         "🛠 **Edit File Menu**\n\nChoose an editing option. This will bypass normal compression.",
         reply_markup=get_edit_menu_markup(msg_id),
     )
+    await callback_query.answer()
 
 
 async def handle_edit_action(client, callback_query, queue_manager):
