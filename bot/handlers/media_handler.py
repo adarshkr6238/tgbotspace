@@ -85,35 +85,20 @@ async def handle_video(client, message, queue_manager):
         node_match = re.search(r"\d+", node_name)
         node_num = int(node_match.group()) if node_match else 1
 
-        # Logic: Node 1 handles odd IDs, Node 2 handles even IDs (or vice versa)
-        # (msg_id % 2) is 0 or 1. We map node 1 to 1 and node 2 to 0.
-        # Use node_num - 1 to get 0 for node1 and 1 for node2 (more standard)
-        is_my_turn = (msg_id_val % 2) == ((node_num - 1) % 2)
-
-        import asyncio
-        from pyrogram.errors import FloodWait
+        # Strict Partitioning:
+        # Node 1 (tgbotspace) strictly processes ODD message IDs (msg_id % 2 != 0).
+        # Node 2 (tgbotspace2) strictly processes EVEN message IDs (msg_id % 2 == 0).
+        is_my_turn = (msg_id_val % 2 != 0) if node_num == 1 else (msg_id_val % 2 == 0)
 
         if not is_my_turn:
-            logger.info(f"Node {node_name} entering standby for msg {msg_id_val} (Node {(msg_id_val % 2) + 1}'s turn).")
-            # Reactive Fallback: Wait to see if the assigned node handles it
-            await asyncio.sleep(15)
-            
-            # Check if any bot in our cluster already replied to this message
-            already_claimed = False
-            try:
-                async for msg in client.get_chat_history(message.chat.id, limit=20):
-                    if msg.reply_to_message_id == message.id and msg.from_user and msg.from_user.is_bot:
-                        # Someone (likely the other node) is already on it
-                        already_claimed = True
-                        break
-            except Exception as e:
-                logger.error(f"Error checking fallback status: {e}")
-            
-            if already_claimed:
-                logger.info(f"Node {node_name} skipping msg {msg_id_val}: already claimed by other node.")
-                return
-            
-            logger.warning(f"Node {node_name} taking over msg {msg_id_val}: assigned node failed to respond in 15s.")
+            logger.info(
+                f"Node {node_name} strictly ignoring msg {msg_id_val} (Node {3 - node_num}'s turn)."
+            )
+            return
+
+        import asyncio
+
+        from pyrogram.errors import FloodWait
 
         status_msg = None
         try:

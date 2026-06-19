@@ -136,6 +136,25 @@ def get_edit_menu_markup(msg_id):
 async def handle_edit_menu(client, callback_query, queue_manager):
     msg_id = int(callback_query.data.split("_")[1])
     task = queue_manager.all_tasks.get(msg_id)
+    
+    # Cross-node lookup if not found locally
+    if not task:
+        import aiohttp, os
+        node_name = os.environ.get("SESSION_NAME", "node1")
+        target_url = (
+            "https://shadow62-tgbotspace2.hf.space/"
+            if node_name != "node2"
+            else "https://shadow62-tgbotspace.hf.space/"
+        )
+        try:
+            async with aiohttp.ClientSession() as session:
+                async with session.get(f"{target_url}tasks/{msg_id}", timeout=2) as resp:
+                    if resp.status == 200:
+                        await callback_query.answer("🔗 Task being handled by the other node. Please try interacting with the bot in a few seconds.", show_alert=True)
+                        return
+        except Exception:
+            pass
+
     if not task:
         await callback_query.answer("❌ Task not found.", show_alert=True)
         return
@@ -153,10 +172,30 @@ async def handle_edit_action(client, callback_query, queue_manager):
     action = data_parts[1]
     msg_id = int(data_parts[-1])  # msg_id is always the last part
     task = queue_manager.all_tasks.get(msg_id)
+    
+    # Cross-node lookup if not found locally
+    if not task:
+        import aiohttp, os
+        node_name = os.environ.get("SESSION_NAME", "node1")
+        target_url = (
+            "https://shadow62-tgbotspace2.hf.space/"
+            if node_name != "node2"
+            else "https://shadow62-tgbotspace.hf.space/"
+        )
+        try:
+            async with aiohttp.ClientSession() as session:
+                async with session.get(f"{target_url}tasks/{msg_id}", timeout=2) as resp:
+                    if resp.status == 200:
+                        await callback_query.answer("🔗 Task being handled by the other node.", show_alert=True)
+                        return
+        except Exception:
+            pass
 
     if not task:
         await callback_query.answer("❌ Task not found.", show_alert=True)
         return
+
+
 
     if action == "back":
         task["is_editing"] = False

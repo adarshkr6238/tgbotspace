@@ -91,10 +91,27 @@ async def remote_delbot(request):
     return web.json_response({"success": False, "message": "Invalid request"}, status=400)
 
 
+async def remote_task_status(request):
+    msg_id = int(request.match_info.get("msg_id"))
+    manager = request.app.get("bot_manager")
+    
+    # Check all running bots on this node
+    found = False
+    for bot in manager.bots.values():
+        if msg_id in bot.queue_manager.all_tasks:
+            found = True
+            break
+            
+    if found:
+        return web.Response(text="OK")
+    return web.Response(status=404)
+
+
 async def start_health_server(bot_manager):
     app = web.Application()
     app["bot_manager"] = bot_manager
     app.router.add_get("/", health_check)
+    app.router.add_get("/tasks/{msg_id}", remote_task_status)
     app.router.add_post("/clear", remote_clear)
     app.router.add_post("/addbot", remote_addbot)
     app.router.add_post("/delbot", remote_delbot)
