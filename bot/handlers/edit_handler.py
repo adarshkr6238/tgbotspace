@@ -146,16 +146,20 @@ async def handle_edit_menu(client, callback_query, queue_manager):
             if node_name != "node2"
             else "https://shadow62-tgbotspace.hf.space/"
         )
+        logger.info(f"Task {msg_id} not found locally on {node_name}. Checking {target_url}")
         try:
             async with aiohttp.ClientSession() as session:
-                async with session.get(f"{target_url}tasks/{msg_id}", timeout=2) as resp:
+                async with session.get(f"{target_url}tasks/{msg_id}", timeout=5) as resp:
+                    logger.info(f"Remote check for task {msg_id} returned status: {resp.status}")
                     if resp.status == 200:
-                        await callback_query.answer("🔗 Task being handled by the other node. Please try interacting with the bot in a few seconds.", show_alert=True)
+                        await callback_query.answer("🔗 Task found on remote node. Redirecting...", show_alert=True)
                         return
-        except Exception:
+        except Exception as e:
+            logger.error(f"Error checking remote task {msg_id}: {e}")
             pass
 
     if not task:
+        logger.warning(f"Task {msg_id} not found on any node.")
         await callback_query.answer("❌ Task not found.", show_alert=True)
         return
 
