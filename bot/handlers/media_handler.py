@@ -138,6 +138,9 @@ async def handle_video(client, message, queue_manager):
             "preset_override": preset_override,
         }
 
+        # Manually register in the registry so callbacks can find it
+        queue_manager.all_tasks[status_msg.id] = task
+
         markup = InlineKeyboardMarkup(
             [
                 [
