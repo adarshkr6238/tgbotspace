@@ -35,7 +35,7 @@ class Config:
     PROGRESS_UPDATE_INTERVAL = 6
 
     # Queue settings
-    MAX_QUEUE_SIZE = 70
+    MAX_QUEUE_SIZE = 200
 
     # Authorized Groups
-    GROUP_ID = -1002335588415
+    GROUP_ID = -5129510877
