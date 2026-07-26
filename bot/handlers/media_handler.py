@@ -147,6 +147,7 @@ async def handle_video(client, message, queue_manager):
 
 
 async def download_stage(client, task, queue_manager):
+    logger.info(f"download_stage called for msg {task['status_msg'].id}")
     message = task["message"]
     status_msg = task["status_msg"]
     msg_id = status_msg.id

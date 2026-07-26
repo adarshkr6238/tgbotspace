@@ -337,9 +337,14 @@ class BotManager:
                 await cb.answer("❌ Task not found.", show_alert=True)
                 return
             
-            # Start download stage manually
-            asyncio.create_task(download_stage(bot, task, bot.queue_manager))
-            await cb.answer("🗜️ Starting download...", show_alert=True)
+            # Re-queue properly via the manager
+            success, pos = await bot.queue_manager.add_task(task)
+            if success:
+                await cb.answer("🗜️ Added to queue!", show_alert=True)
+                from bot.utils.progress import safe_edit
+                await safe_edit(cb.message, f"📝 Added to queue (Position: {pos})")
+            else:
+                await cb.answer(f"❌ {pos}", show_alert=True)
 
         async def _remstream_cb_wrapper(c, cb):
             msg_id = int(cb.data.split("_")[1])
