@@ -1,4 +1,5 @@
 from pyrogram.types import InlineKeyboardMarkup, InlineKeyboardButton
+from bot.handlers.video_edit_handler import handle_remove_streams, handle_extract_streams
 
 class MenuBuilder:
     @staticmethod
@@ -39,22 +40,37 @@ class MenuBuilder:
         
         return InlineKeyboardMarkup(buttons)
 
-def CallbackRouter(callback_query):
+async def CallbackRouter(client, callback_query, queue_manager):
     data = callback_query.data
     if not data:
         return
     
-    prefix = data.split(':')[0]
+    parts = data.split(':')
+    prefix = parts[0]
+    msg_id = int(parts[1]) if len(parts) > 1 else None
     
-    # Simple routing logic
-    if prefix.startswith("vid_"):
-        # Route to video handlers
+    task = queue_manager.all_tasks.get(msg_id)
+    if not task:
+        await callback_query.answer("❌ Task not found.", show_alert=True)
+        return
+
+    # Routing logic
+    if prefix == "vid_rem_asr":
+        from bot.handlers.edit_handler import handle_edit_action
+        callback_query.data = f"edit_stream_{msg_id}"
+        await handle_edit_action(client, callback_query, queue_manager)
+    elif prefix == "vid_ext_asr":
+        from bot.handlers.edit_handler import handle_edit_action
+        callback_query.data = f"edit_stream_{msg_id}"
+        await handle_edit_action(client, callback_query, queue_manager)
+    elif prefix == "vid_trim":
+        from bot.handlers.video_edit_handler import handle_video_trim
+        await handle_video_trim(client, task, queue_manager)
+    elif prefix.startswith("vid_"):
         print(f"Routing video action: {data}")
     elif prefix.startswith("aud_"):
-        # Route to audio handlers
         print(f"Routing audio action: {data}")
     elif prefix.startswith("doc_"):
-        # Route to document handlers
         print(f"Routing document action: {data}")
     else:
-        print(f"Unknown callback prefix: {prefix}")
+        print(f"Unknown callback: {data}")
