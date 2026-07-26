@@ -123,12 +123,14 @@ class QueueManager:
 
     async def continue_task(self, task):
         """Resume a task that was paused for editing and put it in the compression queue."""
+        msg_id = task['status_msg'].id
+        logger.info(f"Resuming task {msg_id}. Putting into compression queue.")
         duration = task.get("duration", 0)
         priority = 1 if (0 < duration <= 300) else 2
         self.task_counter += 1
         await self.compression_queue.put((priority, self.task_counter, task))
         logger.info(
-            f"Task {task['status_msg'].id} continued and added to compression queue."
+            f"Task {msg_id} continued and added to compression queue."
         )
 
     async def compression_worker(self):
