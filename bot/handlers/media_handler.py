@@ -192,19 +192,24 @@ async def download_stage(client, task, queue_manager):
         # Verify download integrity
         if not os.path.exists(input_path) or os.path.getsize(input_path) == 0:
             raise Exception("Downloaded file is empty or missing.")
+    except Exception as e:
+        logger.error(f"Download failed: {e}")
+        await safe_edit(status_msg, f"❌ Download failed: {e}")
+        return
 
+    # Download complete, show menu
     from bot.utils.menu_builder import MenuBuilder
     media_type = 'video' if message.video else 'document' # Simplified for now
     markup = MenuBuilder.build_media_menu(msg_id, media_type)
     
     await safe_edit(status_msg, "✅ Download Complete. Select an action:", reply_markup=markup)
 
-        expected_size = media.file_size
-        actual_size = os.path.getsize(input_path)
-        if abs(actual_size - expected_size) > 1024 * 50:  # Allow 50KB margin
-            logger.warning(
-                f"File size mismatch for {input_path}: Expected {expected_size}, got {actual_size}"
-            )
+    expected_size = media.file_size
+    actual_size = os.path.getsize(input_path)
+    if abs(actual_size - expected_size) > 1024 * 50:  # Allow 50KB margin
+        logger.warning(
+            f"File size mismatch for {input_path}: Expected {expected_size}, got {actual_size}"
+        )
             # We don't necessarily fail here as Telegram sizes can be slightly off, but it's logged.
 
         if not task["duration"]:
