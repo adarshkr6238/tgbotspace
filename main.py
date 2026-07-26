@@ -328,6 +328,34 @@ class BotManager:
         async def _edit_action_cb_wrapper(c, cb):
             await handle_edit_action(c, cb, bot.queue_manager)
 
+        async def _compress_cb_wrapper(c, cb):
+            msg_id = int(cb.data.split("_")[1])
+            task = bot.queue_manager.all_tasks.get(msg_id)
+            if not task:
+                await cb.answer("❌ Task not found.", show_alert=True)
+                return
+            
+            # Add back to queue
+            success, pos = await bot.queue_manager.add_task(task)
+            if success:
+                await cb.answer("🗜️ Added to queue!", show_alert=True)
+                from bot.utils.progress import safe_edit
+                await safe_edit(cb.message, f"📝 Added to queue (Position: {pos})")
+            else:
+                await cb.answer(f"❌ {pos}", show_alert=True)
+
+        async def _remstream_cb_wrapper(c, cb):
+            msg_id = int(cb.data.split("_")[1])
+            # Direct to edit handler for stream removal
+            cb.data = f"edit_stream_{msg_id}"
+            await handle_edit_action(c, cb, bot.queue_manager)
+
+        async def _link_cb_wrapper(c, cb):
+            msg_id = int(cb.data.split("_")[1])
+            # Direct to edit handler for link generation
+            cb.data = f"edit_link_{msg_id}"
+            await handle_edit_action(c, cb, bot.queue_manager)
+
         # Clone Management Commands (Owner Only)
         async def _addbot_cmd(c, m):
             if m.from_user.id != Config.OWNER_ID:
@@ -385,6 +413,9 @@ class BotManager:
         bot.on_callback_query(filters.regex("^diff_"))(_diff_cb_wrapper)
         bot.on_callback_query(filters.regex("^editmenu_"))(_editmenu_cb_wrapper)
         bot.on_callback_query(filters.regex("^edit_"))(_edit_action_cb_wrapper)
+        bot.on_callback_query(filters.regex("^compress_"))(_compress_cb_wrapper)
+        bot.on_callback_query(filters.regex("^remstream_"))(_remstream_cb_wrapper)
+        bot.on_callback_query(filters.regex("^link_"))(_link_cb_wrapper)
         
         bot.on_message((filters.video | filters.document) & (filters.private | filters.chat(Config.GROUP_ID)) & filters.incoming)(
             _media_wrapper

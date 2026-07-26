@@ -142,12 +142,15 @@ async def handle_video(client, message, queue_manager):
             [
                 [
                     InlineKeyboardButton(
-                        "✨ /diff Quality Mode", callback_data=f"diff_{status_msg.id}"
+                        "🗜️ Compress", callback_data=f"compress_{status_msg.id}"
+                    ),
+                    InlineKeyboardButton(
+                        "✂️ Remove Stream", callback_data=f"remstream_{status_msg.id}"
                     )
                 ],
                 [
                     InlineKeyboardButton(
-                        "✏️ Edit File", callback_data=f"editmenu_{status_msg.id}"
+                        "🔗 File to Link", callback_data=f"link_{status_msg.id}"
                     )
                 ],
                 [
@@ -159,32 +162,13 @@ async def handle_video(client, message, queue_manager):
         )
 
         try:
-            await safe_edit(status_msg, "⏳ Adding to queue...", reply_markup=markup)
+            await safe_edit(status_msg, "⏳ Select an action:", reply_markup=markup)
         except FloodWait as e:
             logger.warning(f"FloodWait on edit. Sleeping {e.value}s")
             await asyncio.sleep(e.value)
-            await safe_edit(status_msg, "⏳ Adding to queue...", reply_markup=markup)
+            await safe_edit(status_msg, "⏳ Select an action:", reply_markup=markup)
         except Exception:
             pass  # Ignore MessageNotModified or similar harmless errors
-
-        success, pos = await queue_manager.add_task(task)
-        if not success:
-            await safe_edit(status_msg, f"❌ {pos}")
-            return
-
-        try:
-            await safe_edit(status_msg, 
-                f"📝 Added to queue (Position: {pos})\n\nShort videos (<= 5 min) get priority!",
-                reply_markup=markup,
-            )
-        except FloodWait as e:
-            await asyncio.sleep(e.value)
-            await safe_edit(status_msg, 
-                f"📝 Added to queue (Position: {pos})\n\nShort videos (<= 5 min) get priority!",
-                reply_markup=markup,
-            )
-        except Exception:
-            pass
     except Exception as e:
         logger.error(f"Error in handle_video for msg {message.id}: {e}", exc_info=True)
 
