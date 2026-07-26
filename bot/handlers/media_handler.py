@@ -193,30 +193,11 @@ async def download_stage(client, task, queue_manager):
         if not os.path.exists(input_path) or os.path.getsize(input_path) == 0:
             raise Exception("Downloaded file is empty or missing.")
 
-        # Download complete, show menu
-        markup = InlineKeyboardMarkup(
-            [
-                [
-                    InlineKeyboardButton(
-                        "🗜️ Compress", callback_data=f"compress_{msg_id}"
-                    ),
-                    InlineKeyboardButton(
-                        "✂️ Remove Stream", callback_data=f"remstream_{msg_id}"
-                    )
-                ],
-                [
-                    InlineKeyboardButton(
-                        "🔗 File to Link", callback_data=f"link_{msg_id}"
-                    )
-                ],
-                [
-                    InlineKeyboardButton(
-                        "❌ Cancel", callback_data=f"cancel_{msg_id}"
-                    )
-                ],
-            ]
-        )
-        await safe_edit(status_msg, "✅ Download Complete. Select an action:", reply_markup=markup)
+    from bot.utils.menu_builder import MenuBuilder
+    media_type = 'video' if message.video else 'document' # Simplified for now
+    markup = MenuBuilder.build_media_menu(msg_id, media_type)
+    
+    await safe_edit(status_msg, "✅ Download Complete. Select an action:", reply_markup=markup)
 
         expected_size = media.file_size
         actual_size = os.path.getsize(input_path)

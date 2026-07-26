@@ -407,15 +407,15 @@ class BotManager:
         bot.on_message(filters.command("delbot") & (filters.private | filters.chat(Config.GROUP_ID)))(_delbot_cmd)
         bot.on_message(filters.command("clones") & (filters.private | filters.chat(Config.GROUP_ID)))(_clones_cmd)
 
-        bot.on_callback_query(filters.regex("^settings_main$"))(_settings_cb_wrapper)
-        bot.on_callback_query(filters.regex("^set_"))(_set_preset_wrapper)
+        from bot.utils.menu_builder import CallbackRouter
+
+        async def _universal_cb_wrapper(c, cb):
+            CallbackRouter(cb)
+            
+        bot.on_callback_query(filters.regex("^vid_"))(_universal_cb_wrapper)
+        bot.on_callback_query(filters.regex("^aud_"))(_universal_cb_wrapper)
+        bot.on_callback_query(filters.regex("^doc_"))(_universal_cb_wrapper)
         bot.on_callback_query(filters.regex("^cancel_"))(_cancel_cb_wrapper)
-        bot.on_callback_query(filters.regex("^diff_"))(_diff_cb_wrapper)
-        bot.on_callback_query(filters.regex("^editmenu_"))(_editmenu_cb_wrapper)
-        bot.on_callback_query(filters.regex("^edit_"))(_edit_action_cb_wrapper)
-        bot.on_callback_query(filters.regex("^compress_"))(_compress_cb_wrapper)
-        bot.on_callback_query(filters.regex("^remstream_"))(_remstream_cb_wrapper)
-        bot.on_callback_query(filters.regex("^link_"))(_link_cb_wrapper)
         
         bot.on_message((filters.video | filters.document) & (filters.private | filters.chat(Config.GROUP_ID)) & filters.incoming)(
             _media_wrapper
