@@ -141,37 +141,7 @@ async def handle_video(client, message, queue_manager):
         # Manually register in the registry so callbacks can find it
         queue_manager.all_tasks[status_msg.id] = task
 
-        markup = InlineKeyboardMarkup(
-            [
-                [
-                    InlineKeyboardButton(
-                        "🗜️ Compress", callback_data=f"compress_{status_msg.id}"
-                    ),
-                    InlineKeyboardButton(
-                        "✂️ Remove Stream", callback_data=f"remstream_{status_msg.id}"
-                    )
-                ],
-                [
-                    InlineKeyboardButton(
-                        "🔗 File to Link", callback_data=f"link_{status_msg.id}"
-                    )
-                ],
-                [
-                    InlineKeyboardButton(
-                        "❌ Cancel", callback_data=f"cancel_{status_msg.id}"
-                    )
-                ],
-            ]
-        )
-
-        try:
-            await safe_edit(status_msg, "⏳ Select an action:", reply_markup=markup)
-        except FloodWait as e:
-            logger.warning(f"FloodWait on edit. Sleeping {e.value}s")
-            await asyncio.sleep(e.value)
-            await safe_edit(status_msg, "⏳ Select an action:", reply_markup=markup)
-        except Exception:
-            pass  # Ignore MessageNotModified or similar harmless errors
+        await safe_edit(status_msg, "⏳ Initializing download...")
     except Exception as e:
         logger.error(f"Error in handle_video for msg {message.id}: {e}", exc_info=True)
 
@@ -185,19 +155,7 @@ async def download_stage(client, task, queue_manager):
         await safe_edit(status_msg, "❌ Task Cancelled.")
         return
 
-    markup = InlineKeyboardMarkup(
-        [
-            [
-                InlineKeyboardButton(
-                    "✨ /diff Quality Mode", callback_data=f"diff_{msg_id}"
-                )
-            ],
-            [InlineKeyboardButton("✏️ Edit File", callback_data=f"editmenu_{msg_id}")],
-            [InlineKeyboardButton("❌ Cancel", callback_data=f"cancel_{msg_id}")],
-        ]
-    )
-
-    await safe_edit(status_msg, "📥 Downloading...", reply_markup=markup)
+    await safe_edit(status_msg, "📥 Downloading...", reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("❌ Cancel", callback_data=f"cancel_{msg_id}")]]))
     start_time = time.time()
     last_update = start_time
 
@@ -218,7 +176,7 @@ async def download_stage(client, task, queue_manager):
             start_time,
             last_update,
             task,
-            reply_markup=markup,
+            reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("❌ Cancel", callback_data=f"cancel_{msg_id}")]]),
         )
 
     try:
@@ -228,6 +186,31 @@ async def download_stage(client, task, queue_manager):
         # Verify download integrity
         if not os.path.exists(input_path) or os.path.getsize(input_path) == 0:
             raise Exception("Downloaded file is empty or missing.")
+
+        # Download complete, show menu
+        markup = InlineKeyboardMarkup(
+            [
+                [
+                    InlineKeyboardButton(
+                        "🗜️ Compress", callback_data=f"compress_{msg_id}"
+                    ),
+                    InlineKeyboardButton(
+                        "✂️ Remove Stream", callback_data=f"remstream_{msg_id}"
+                    )
+                ],
+                [
+                    InlineKeyboardButton(
+                        "🔗 File to Link", callback_data=f"link_{msg_id}"
+                    )
+                ],
+                [
+                    InlineKeyboardButton(
+                        "❌ Cancel", callback_data=f"cancel_{msg_id}"
+                    )
+                ],
+            ]
+        )
+        await safe_edit(status_msg, "✅ Download Complete. Select an action:", reply_markup=markup)
 
         expected_size = media.file_size
         actual_size = os.path.getsize(input_path)
