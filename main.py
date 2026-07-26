@@ -102,6 +102,8 @@ async def remote_task_status(request):
             found = True
             break
             
+    logger.info(f"Remote task lookup for {msg_id}: {'Found' if found else 'Not Found'} on {os.environ.get('SESSION_NAME', 'node1')}")
+    
     if found:
         return web.Response(text="OK")
     return web.Response(status=404)
