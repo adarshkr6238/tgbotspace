@@ -140,6 +140,11 @@ async def handle_video(client, message, queue_manager):
 
         # Manually register in the registry so callbacks can find it
         queue_manager.all_tasks[status_msg.id] = task
+        # Pause task for user selection
+        task["is_editing"] = True
+        
+        # Add to queue, but it will be paused because is_editing is True
+        await queue_manager.add_task(task)
 
         await safe_edit(status_msg, "⏳ Initializing download...")
     except Exception as e:
