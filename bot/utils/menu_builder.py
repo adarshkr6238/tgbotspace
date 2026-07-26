@@ -66,6 +66,12 @@ async def CallbackRouter(client, callback_query, queue_manager):
     elif prefix == "vid_trim":
         from bot.handlers.video_edit_handler import handle_video_trim
         await handle_video_trim(client, task, queue_manager)
+    elif prefix == "vid_merge":
+        from bot.handlers.video_edit_handler import handle_video_merge
+        await handle_video_merge(client, task, queue_manager)
+    elif prefix == "vid_mute":
+        from bot.handlers.video_edit_handler import handle_video_mute
+        await handle_video_mute(client, task, queue_manager)
     elif prefix.startswith("vid_"):
         print(f"Routing video action: {data}")
     elif prefix.startswith("aud_"):

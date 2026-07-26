@@ -32,3 +32,29 @@ async def handle_video_trim(client, task, queue_manager):
         "✂️ Please send the start and end times in the format: `HH:MM:SS HH:MM:SS`\nExample: `00:00:10 00:00:30`", reply_markup=markup
     )
     return True
+
+async def handle_video_merge(client, task, queue_manager):
+    task["is_editing"] = True
+    queue_manager.set_edit_state(task["user_id"], "WAITING_FOR_MERGE_FILES", task["status_msg"].id)
+    
+    markup = InlineKeyboardMarkup(
+        [[InlineKeyboardButton("❌ Cancel", callback_data=f"cancel_{task['status_msg'].id}")]]
+    )
+    await safe_edit(task["status_msg"], 
+        "🎥 Please send the video files you want to merge (in order). Send /done when finished.", reply_markup=markup
+    )
+    return True
+
+async def handle_video_mute(client, task, queue_manager):
+    task["preset_override"] = "mute"
+    task["is_editing"] = False
+    
+    markup = InlineKeyboardMarkup(
+        [[InlineKeyboardButton("❌ Cancel", callback_data=f"cancel_{task['status_msg'].id}")]]
+    )
+    await safe_edit(task["status_msg"], 
+        "🔇 Mute audio registered. Processing...", reply_markup=markup
+    )
+    # Trigger processing
+    await queue_manager.continue_task(task)
+    return True
