@@ -318,10 +318,17 @@ async def compression_stage(client, task, queue_manager):
             if out_files:
                 output_files = out_files
                 success = True
-        elif preset_name == "edit_sample":
-            await safe_edit(status_msg, "🎬 Extracting sample...", reply_markup=markup)
-            success, error_msg = await extract_sample(
-                input_path, output_path, comp_progress, task
+        elif preset_name.startswith("edit_stream_"):
+            indices = [int(i) for i in preset_name.split("_")[2:]]
+            await safe_edit(status_msg, "✂️ Removing streams...", reply_markup=markup)
+            success, error_msg = await remove_stream(
+                input_path, output_path, indices, comp_progress, task
+            )
+        elif preset_name == "edit_vmerge":
+            # merge_files holds list of local paths from edit_sessions
+            await safe_edit(status_msg, "🔗 Merging videos...", reply_markup=markup)
+            success, error_msg = await merge_videos(
+                task["merge_files"], output_path, comp_progress, task
             )
         elif preset_name == "edit_link":
             import shutil
