@@ -410,7 +410,7 @@ class BotManager:
         from bot.utils.menu_builder import CallbackRouter
 
         async def _universal_cb_wrapper(c, cb):
-            CallbackRouter(cb)
+            await CallbackRouter(c, cb, bot.queue_manager)
             
         bot.on_callback_query(filters.regex("^vid_"))(_universal_cb_wrapper)
         bot.on_callback_query(filters.regex("^aud_"))(_universal_cb_wrapper)

@@ -428,6 +428,40 @@ async def remove_stream(
     return process.returncode == 0, full_stderr if process.returncode != 0 else ""
 
 
+async def extract_stream(
+    input_path, output_path, stream_index, progress_callback, task
+):
+    info = await get_video_info(input_path)
+    if not info:
+        return False, "Could not read video"
+    duration = float(info.get("format", {}).get("duration", 0))
+
+    cmd = ["ffmpeg", "-y", "-i", input_path, "-map", f"0:{stream_index}", "-c", "copy", output_path]
+
+    process = await asyncio.create_subprocess_exec(*cmd, stderr=asyncio.subprocess.PIPE)
+    task["process"] = process
+    full_stderr = ""
+    while True:
+        try:
+            chunk = await process.stderr.read(1024)
+            if not chunk:
+                break
+            line = chunk.decode("utf-8", errors="ignore")
+            full_stderr += line
+            if "time=" in line:
+                match = TIME_REGEX.search(line)
+                if match:
+                    h, m, s = match.group(1).split(":")
+                    current_time = int(h) * 3600 + int(m) * 60 + float(s)
+                    if duration > 0:
+                        await progress_callback(current_time, duration)
+        except:
+            break
+    await process.wait()
+    task["process"] = None
+    return process.returncode == 0, full_stderr if process.returncode != 0 else ""
+
+
 async def mux_audio_video(video_path, audio_path, output_path, progress_callback, task):
     info = await get_video_info(video_path)
     if not info:
