@@ -359,6 +359,7 @@ async def handle_edit_action(client, callback_query, queue_manager):
 
     elif action == "stream":
         input_path = task.get("input_path")
+        # Check if the file exists and is not empty. If it's a download task, it might be in progress.
         if input_path and os.path.exists(input_path) and os.path.getsize(input_path) > 0:
             # Download is already finished, show streams immediately
             from bot.services.ffmpeg_service import get_video_info
@@ -388,6 +389,7 @@ async def handle_edit_action(client, callback_query, queue_manager):
                 task["user_id"], "WAITING_FOR_DOWNLOAD_TO_FINISH", msg_id
             )
 
+            await callback_query.answer("⏳ Will show stream menu after download finishes.", show_alert=True)
             await safe_edit(callback_query.message, 
                 "✂️ **Stream Remover**\n\n"
                 "Waiting for the video to finish downloading so I can analyze its tracks...\n"
