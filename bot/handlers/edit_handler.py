@@ -363,6 +363,7 @@ async def handle_edit_action(client, callback_query, queue_manager):
             # Download is already finished, show streams immediately
             from bot.services.ffmpeg_service import get_video_info
             
+            await callback_query.answer("⏳ Analyzing streams...", show_alert=False)
             await safe_edit(callback_query.message, "⏳ Analyzing video streams...", reply_markup=None)
             info = await get_video_info(input_path)
             streams = info.get("streams", []) if info else []
