@@ -585,19 +585,7 @@ class BotManager:
 
 
 async def main():
-    # Enforce cluster synchronization via SPACE_ID auto-detection
-    space_id = os.environ.get("SPACE_ID", "")
-    if space_id:
-        space_name = space_id.split("/")[-1].lower()
-        if "2" in space_name or "tgbotspace2" in space_name:
-            os.environ["SESSION_NAME"] = "node2"
-        else:
-            os.environ["SESSION_NAME"] = "node1"
-    
-    if not os.environ.get("SESSION_NAME"):
-        os.environ["SESSION_NAME"] = "node1"
-
-    logger.info(f"🚀 Starting Cluster Node: {os.environ['SESSION_NAME']}")
+    logger.info(f"🚀 Starting Bot Instance")
     
     setup_storage()
     manager = BotManager()
