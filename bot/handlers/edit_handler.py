@@ -231,23 +231,35 @@ async def handle_edit_action(client, callback_query, queue_manager):
             await queue_manager.continue_task(task)
         return
 
-    # Mark task as an edit task to bypass standard compression
-    task["preset_override"] = f"edit_{action}"
-
-    if action in ["sample", "link"]:
-        task["is_editing"] = False
-        queue_manager.clear_edit_state(task["user_id"])
-        action_name = "Sample generation" if action == "sample" else "Link generation"
-        markup = InlineKeyboardMarkup(
+    # If download hasn't happened yet, we need to trigger it now.
+    if not task.get("input_path"):
+        # We need to trigger the download stage here.
+        # But download_stage expects a 'task' and runs in the queue manager context.
+        # Let's set up the task to be downloaded and tell the queue manager to continue.
+        
+        # We need to inform the queue manager that we want to start downloading.
+        # The simplest way is to put the task into the queue_manager's processing logic.
+        
+        # Before continuing, we might need to perform some setup that was previously in media_handler.
+        # Since we refactored, let's just make sure we are not already downloading.
+        
+        # A simple way to trigger the download now:
+        # 1. Update status to "Downloading..."
+        # 2. Add to queue_manager's download queue.
+        # 3. Mark task['preset_override'] so that when download finishes, it proceeds to the right step.
+        
+        # Set the preset override based on the action
+        task["preset_override"] = f"edit_{action}"
+        
+        # Put into download queue
+        await queue_manager.add_to_download_queue(task)
+        
+        # Update user
+        await safe_edit(callback_query.message, "📥 Adding to download queue...", reply_markup=InlineKeyboardMarkup(
             [[InlineKeyboardButton("❌ Cancel", callback_data=f"cancel_{msg_id}")]]
-        )
-        await safe_edit(callback_query.message, 
-            f"📝 {action_name} registered. Added to queue (Position: {queue_manager.get_position(task)}).",
-            reply_markup=markup,
-        )
-        input_path = task.get("input_path")
-        if input_path and os.path.exists(input_path):
-            await queue_manager.continue_task(task)
+        ))
+        
+        # The user has selected their option, no need to keep showing the edit menu
         return
 
     if action == "vmerge":

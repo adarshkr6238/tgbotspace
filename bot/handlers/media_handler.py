@@ -41,49 +41,31 @@ async def handle_video(client, message, queue_manager):
                 return
 
         setup_storage()
-        status_msg = await message.reply_text("⏳ Analyzing and adding to queue...", quote=True)
+        status_msg = await message.reply_text("⏳ Initializing task...", quote=True)
         
-        duration = message.video.duration if message.video else 0
-        if not duration and message.document:
-            duration = 0 
-
-        preset_override = None
-        caption = message.caption or message.text or ""
-        if caption.strip().startswith("/diff"):
-            preset_override = "diff"
-
+        # Create a task object without triggering download/compression yet
         task = {
             'message': message,
             'status_msg': status_msg,
             'user_id': user_id,
             'paths': [],
             'input_path': None,
-            'duration': duration,
+            'duration': message.video.duration if message.video else 0,
             'is_paused': False,
+            'is_editing': True, # Start in editing state
             'process': None,
             'percentage': 0,
-            'preset_override': preset_override
+            'preset_override': None
         }
         
-        markup = InlineKeyboardMarkup([
-            [InlineKeyboardButton("✨ /diff Quality Mode", callback_data=f"diff_{status_msg.id}")],
-            [InlineKeyboardButton("✏️ Edit File", callback_data=f"editmenu_{status_msg.id}")],
-            [InlineKeyboardButton("❌ Cancel", callback_data=f"cancel_{status_msg.id}")]
-        ])
-        
-        await status_msg.edit_text(
-            "⏳ Adding to queue...",
-            reply_markup=markup
-        )
-        
-        success, pos = await queue_manager.add_task(task)
-        if not success:
-            await status_msg.edit_text(f"❌ {pos}")
-            return
+        # Register the task in the queue manager so it can be found by callback queries
+        queue_manager.all_tasks[status_msg.id] = task
 
+        # Show the Edit Menu immediately
+        from bot.handlers.edit_handler import get_edit_menu_markup
         await status_msg.edit_text(
-            f"📝 Added to queue (Position: {pos})\n\nShort videos (<= 5 min) get priority!",
-            reply_markup=markup
+            "✅ File received. Choose an action:",
+            reply_markup=get_edit_menu_markup(status_msg.id)
         )
     except Exception as e:
         logger.error(f"Error in handle_video for msg {message.id}: {e}", exc_info=True)
