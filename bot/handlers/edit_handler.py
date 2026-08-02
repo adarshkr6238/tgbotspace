@@ -2,6 +2,7 @@ from pyrogram.types import InlineKeyboardButton, InlineKeyboardMarkup
 from bot.utils.progress import safe_edit
 import os
 import logging
+import aiohttp
 
 logger = logging.getLogger(__name__)
 
