@@ -208,6 +208,7 @@ async def compression_stage(client, task, queue_manager):
             out_files, error_msg = await split_video(input_path, Config.TEMP_DIR, parts, comp_progress, task)
             if out_files:
                 output_files = out_files
+                task['paths'].extend(out_files)
                 success = True
         elif preset_name == "edit_sample":
             await status_msg.edit_text("🎬 Extracting sample...", reply_markup=markup)
@@ -406,6 +407,7 @@ async def compression_stage(client, task, queue_manager):
                     retries -= 1
             
         await status_msg.delete()
+        queue_manager.cleanup_task(task)
         clear_cancel_flag(msg_id)
         import gc
         gc.collect() 

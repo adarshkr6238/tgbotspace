@@ -223,13 +223,7 @@ class QueueManager:
     async def process_compression(self, task):
         pass
 
-    def cleanup_task(self, task, force=False):
-        if not force and not task.get("is_success"):
-            logger.warning(
-                f"Task {task.get('status_msg', {}).id} did not succeed. Skipping file deletion for debug/retry."
-            )
-            return
-
+    def cleanup_task(self, task):
         for p in task.get("paths", []):
             if os.path.exists(p):
                 try:
