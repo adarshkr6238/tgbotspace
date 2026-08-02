@@ -11,6 +11,8 @@ from bot.utils.fast_transfer import fast_download, fast_upload
 
 logger = logging.getLogger(__name__)
 
+from pyrogram.errors import FloodWait
+
 async def send_log_file(message, text, title="Error Log"):
     log_path = f"error_log_{message.id}.txt"
     try:
@@ -21,6 +23,8 @@ async def send_log_file(message, text, title="Error Log"):
             caption=f"❌ **{title}**\nFull logs attached above.",
             quote=True
         )
+    except FloodWait:
+        pass # Ignore rate limit errors
     except Exception as e:
         logger.error(f"Failed to send log file: {e}")
     finally:
