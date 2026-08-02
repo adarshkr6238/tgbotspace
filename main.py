@@ -417,6 +417,7 @@ class BotManager:
         bot.on_callback_query(filters.regex("^doc_"))(_universal_cb_wrapper)
         bot.on_callback_query(filters.regex("^cancel_"))(_cancel_cb_wrapper)
         bot.on_callback_query(filters.regex("^editmenu_"))(_editmenu_cb_wrapper)
+        bot.on_callback_query(filters.regex("^edit_"))(_edit_action_cb_wrapper)
         
         bot.on_message((filters.video | filters.document) & (filters.private | filters.chat(Config.GROUP_ID)) & filters.incoming)(
             _media_wrapper
