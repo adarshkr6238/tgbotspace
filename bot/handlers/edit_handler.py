@@ -1,4 +1,5 @@
 from pyrogram.types import InlineKeyboardButton, InlineKeyboardMarkup
+from bot.utils.progress import safe_edit
 
 
 def build_stream_keyboard(streams, streams_to_remove, msg_id):
