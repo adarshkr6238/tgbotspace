@@ -406,6 +406,8 @@ async def compression_stage(client, task, queue_manager):
     except Exception as e:
         if str(e) == "CANCELLED":
             await status_msg.edit_text("❌ Task Cancelled.")
+        elif isinstance(e, FloodWait):
+            pass # Rate limit errors should not send logs
         else:
             await status_msg.edit_text("❌ **System Error.** Sending logs...")
             await send_log_file(message, str(e), "System Exception")
