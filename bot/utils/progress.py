@@ -118,10 +118,26 @@ async def progress_bar(
     # Actually, the user's issue is that the progress bar updates are *overwriting* 
     # their edit menu. Let's make sure we only update if it's a progress update.
     
-    # To fix the user's issue: if an edit menu is active (task['is_editing'] is True),
-    # we should NOT update the message with progress bar.
+    # To fix the user's issue: only suppress progress bar updates if we are actively
+    # waiting for user selection (e.g., in a selection state).
+    # 'is_editing' is True even during download for edit tasks, but we want 
+    # to show progress there.
     
-    if task and task.get("is_editing"):
+    # We can check a specific edit state if available in task.
+    # From queue_manager, we can set a specific state.
+    
+    is_selecting = False
+    if task:
+        # Check if we have access to queue_manager to check state
+        # Or better, check if the task has a specific state indicator
+        # For now, let's assume if it is downloading, we should show progress.
+        if status_text == "Downloading" or status_text == "Uploading" or status_text.startswith("Processing"):
+            is_selecting = False
+        else:
+            # We are likely in a menu selection phase
+            is_selecting = task.get("is_editing", False)
+            
+    if is_selecting:
         _is_updating.discard(msg_id)
         return now
 
