@@ -139,13 +139,19 @@ async def download_stage(client, task, queue_manager):
                 "*(Click to toggle, then click Finish)*",
                 reply_markup=markup
             )
-            # We don't advance to compression stage yet. The queue_manager will pause
-            # because 'is_editing' is True.
+            # IMPORTANT: Do not continue to compression_stage!
+            return
+            
         elif not task.get('is_editing'):
+            # Proceed to compression if not editing
+            await queue_manager.continue_task(task)
             await status_msg.edit_text(
                 "✅ Ready for processing...",
                 reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("❌ Cancel", callback_data=f"cancel_{msg_id}")]])
             )
+        else:
+            # Just finish the download stage, processing will be triggered by continue_task elsewhere
+            pass
     except Exception as e:
         if str(e) == "CANCELLED":
             await status_msg.edit_text("❌ Task Cancelled.")
