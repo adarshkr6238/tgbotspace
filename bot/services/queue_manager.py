@@ -50,6 +50,12 @@ class QueueManager:
         except Exception as e:
             logger.error(f"Error saving settings: {e}")
 
+    async def add_to_download_queue(self, task):
+        duration = task.get("duration", 0)
+        priority = 1 if (0 < duration <= 300) else 2
+        self.task_counter += 1
+        await self.download_queue.put((priority, self.task_counter, task))
+
     async def add_task(self, task):
         if self.get_queue_status() >= Config.MAX_QUEUE_SIZE:
             return False, "Queue is full"
