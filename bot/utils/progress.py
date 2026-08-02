@@ -94,12 +94,38 @@ async def progress_bar(
 
     _last_string[msg_id] = progress_str
 
-    try:
+    # Check if we should even update. If the current reply_markup is an edit menu, 
+    # we might want to avoid overriding it with progress bar updates.
+    # We can detect this if the user passed a custom markup.
+    
+    # If the user passed a specific markup (like the edit menu), we should keep it.
+    # Only if it's the default 'Cancel' button, we can potentially overwrite it.
+    
+    if reply_markup is not None:
+        # Keep the provided markup
+        markup = reply_markup
+    else:
+        # Default markup
         from pyrogram.types import InlineKeyboardButton, InlineKeyboardMarkup
-
-        markup = reply_markup or InlineKeyboardMarkup(
+        markup = InlineKeyboardMarkup(
             [[InlineKeyboardButton("❌ Cancel", callback_data=f"cancel_{msg_id}")]]
         )
+        
+    # Check if the current message already has an edit menu that we shouldn't overwrite.
+    # A simple heuristic: if it's the download progress bar, we can overwrite.
+    # But if the current progress_str is not just for download, maybe we shouldn't.
+    
+    # Actually, the user's issue is that the progress bar updates are *overwriting* 
+    # their edit menu. Let's make sure we only update if it's a progress update.
+    
+    # To fix the user's issue: if an edit menu is active (task['is_editing'] is True),
+    # we should NOT update the message with progress bar.
+    
+    if task and task.get("is_editing"):
+        _is_updating.discard(msg_id)
+        return now
+
+    try:
         await safe_edit(message, progress_str, reply_markup=markup)
     except Exception:
         pass
